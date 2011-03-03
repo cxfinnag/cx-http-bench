@@ -12,14 +12,36 @@
 static void usage(const char *name);
 struct addrinfo *lookup_host(const char *address);
 static void print_addresses(struct addrinfo *ai);
+static void parse_arguments(int argc, char **argv);
+
+static int loop_mode = 0;
+static int random_mode = 0;
+static int num_parallell = 1;
 
 int
 main(int argc, char **argv)
 {
-	int loop_mode = 0;
-	int random_mode = 0;
-	int num_parallell = 1;
+	parse_arguments(argc, argv);
 
+	argc -= optind;
+	argv += optind;
+
+	struct addrinfo *res = lookup_host(argv[0]);
+	if (!res) {
+		fprintf(stderr, "Host lookup failed.");
+		exit(EXIT_FAILURE);
+	}
+	print_addresses(res);
+	freeaddrinfo(res);
+
+	printf("options parsed, good to GO!\n");
+	
+	exit(EXIT_SUCCESS);
+}
+
+static void
+parse_arguments(int argc, char **argv)
+{
 	static struct option opts[] = {
 		{ "loop", no_argument, NULL, 'l' },
 		{ "randomize", no_argument, NULL, 'r' },
@@ -62,21 +84,6 @@ main(int argc, char **argv)
 		usage(argv[0]);
 		exit(EXIT_FAILURE);
 	}
-
-	argc -= optind;
-	argv += optind;
-
-	struct addrinfo *res = lookup_host(argv[0]);
-	if (!res) {
-		fprintf(stderr, "Host lookup failed.");
-		exit(EXIT_FAILURE);
-	}
-	print_addresses(res);
-	freeaddrinfo(res);
-
-	printf("options parsed, good to GO!\n");
-	
-	exit(EXIT_SUCCESS);
 }
 
 static void

@@ -15,7 +15,7 @@ struct addrinfo *lookup_host(const char *address);
 static void print_addresses(const struct addrinfo *ai);
 static void parse_arguments(int argc, char **argv);
 static int test_connection(const struct addrinfo *addr);
-static const char *lookup_addrinfo(const struct addrinfo *, char *host, size_t hostlen, char *port, size_t portlen);
+static int lookup_addrinfo(const struct addrinfo *, char *host, size_t hostlen, char *port, size_t portlen);
 
 static int loop_mode = 0;
 static int random_mode = 0;
@@ -74,7 +74,7 @@ test_connection(const struct addrinfo *addr)
 	return error;
 }
 
-static const char *
+static int
 lookup_addrinfo(const struct addrinfo *ai, char *host, size_t hostlen, char *port, size_t portlen)
 {
 	
@@ -85,7 +85,7 @@ lookup_addrinfo(const struct addrinfo *ai, char *host, size_t hostlen, char *por
 		strlcpy(port, "(invalid)", portlen);
 	}
 
-	return host; /* To make this friendly in printf() statements */
+	return error;
 }
 
 static void
@@ -142,16 +142,14 @@ print_addresses(const struct addrinfo *ai)
 	char service[NI_MAXSERV];
 
 	for (; ai; ai = ai->ai_next) {
-		int error;
-		if ((error = getnameinfo(ai->ai_addr, ai->ai_addrlen, host,
-					 sizeof host, service, sizeof service,
-					 NI_NUMERICHOST | NI_NUMERICSERV))) {
+		int error = lookup_addrinfo(ai, host, sizeof host, service,
+					    sizeof service);
+		if (error) {
 			fprintf(stderr, "numeric conv: %s\n", gai_strerror(error));
 			continue;
 		}
 		printf("Address: %s port %s\n", host, service);
 	}
-
 }
 
 

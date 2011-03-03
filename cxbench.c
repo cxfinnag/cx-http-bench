@@ -9,6 +9,7 @@
 #include <sys/socket.h>
 #include <netdb.h>
 #include <errno.h>
+#include <sys/time.h>
 
 static void usage(const char *name);
 struct addrinfo *lookup_host(const char *address);
@@ -16,6 +17,8 @@ static void print_addresses(const struct addrinfo *ai);
 static void parse_arguments(int argc, char **argv);
 static int test_connection(const struct addrinfo *addr);
 static int lookup_addrinfo(const struct addrinfo *, char *host, size_t hostlen, char *port, size_t portlen);
+
+static double now();
 
 static int loop_mode = 0;
 static int random_mode = 0;
@@ -62,13 +65,15 @@ test_connection(const struct addrinfo *addr)
 	char port[NI_MAXSERV];
 	lookup_addrinfo(addr, host, sizeof host, port, sizeof port);
 	printf("Testing connection to %s:%s...\n", host, port);
-								 
+	
+	double t1 = now();
 	int error = connect(fd, addr->ai_addr, addr->ai_addrlen);
 	if (error == -1) {
 		fprintf(stderr, "Failed to connect: %s\n", strerror(errno));
 		goto out;
 	}
-	fprintf(stderr, "Connection OK.\n");
+	double t2 = now();
+	fprintf(stderr, "Connection OK in %.3fms.\n", 1e3 * (t2 - t1));
  out:
 	close(fd);
 	return error;
@@ -183,6 +188,13 @@ lookup_host(const char *address)
 		return NULL;
 	}
 	return res;
+}
+
+static double now()
+{
+	struct timeval tv;
+	gettimeofday(&tv, NULL);
+	return tv.tv_sec + 1e-6 * tv.tv_usec;
 }
 
 static void

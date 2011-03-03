@@ -11,6 +11,7 @@
 
 static void usage(const char *name);
 struct addrinfo *lookup_host(const char *address);
+static void print_addresses(struct addrinfo *ai);
 
 int
 main(int argc, char **argv)
@@ -70,11 +71,33 @@ main(int argc, char **argv)
 		fprintf(stderr, "Host lookup failed.");
 		exit(EXIT_FAILURE);
 	}
-       
+	print_addresses(res);
+	freeaddrinfo(res);
 
 	printf("options parsed, good to GO!\n");
+	
 	exit(EXIT_SUCCESS);
 }
+
+static void
+print_addresses(struct addrinfo *ai)
+{
+	char host[NI_MAXHOST];
+	char service[NI_MAXSERV];
+
+	for (; ai; ai = ai->ai_next) {
+		int error;
+		if ((error = getnameinfo(ai->ai_addr, ai->ai_addrlen, host,
+					 sizeof host, service, sizeof service,
+					 NI_NUMERICHOST | NI_NUMERICSERV))) {
+			fprintf(stderr, "numeric conv: %s\n", gai_strerror(error));
+			continue;
+		}
+		printf("Address: %s port %s\n", host, service);
+	}
+
+}
+
 
 struct addrinfo *
 lookup_host(const char *address)
@@ -102,7 +125,7 @@ lookup_host(const char *address)
 	struct addrinfo *res;
 	int error = getaddrinfo(name, port, &hints, &res);
 	if (error) {
-		fprintf(stderr, "Resolver error: %s", gai_strerror(error));
+		fprintf(stderr, "Resolver error: %s\n", gai_strerror(error));
 		return NULL;
 	}
 	return res;

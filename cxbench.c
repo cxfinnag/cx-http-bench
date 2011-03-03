@@ -2,10 +2,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <sys/types.h>
 #include <unistd.h>
 #include <getopt.h>
+#include <string.h>
+#include <sys/socket.h>
+#include <netdb.h>
 
 static void usage(const char *name);
+struct addrinfo *lookup_host(const char *address);
 
 int
 main(int argc, char **argv)
@@ -13,16 +18,6 @@ main(int argc, char **argv)
 	int loop_mode = 0;
 	int random_mode = 0;
 	int num_parallell = 1;
-
-	int num_parallel;
-	
-	/* input: stdin? */
-	/* server:port */
-	/* options:
-	   -l --loop [reuse stdin]
-	   -r --randomize [queries in random order]
-	   -p --parallell [run p queries in parallell]
-	*/
 
 	static struct option opts[] = {
 		{ "loop", no_argument, NULL, 'l' },
@@ -58,8 +53,59 @@ main(int argc, char **argv)
 		}
 	}
 
+	if (argc - optind != 1) {
+		if (argc - optind < 1)
+			fprintf(stderr, "Missing host:port argument!\n");
+		else
+			fprintf(stderr, "Too many arguments!\n");
+		usage(argv[0]);
+		exit(EXIT_FAILURE);
+	}
+
+	argc -= optind;
+	argv += optind;
+
+	struct addrinfo *res = lookup_host(argv[0]);
+	if (!res) {
+		fprintf(stderr, "Host lookup failed.");
+		exit(EXIT_FAILURE);
+	}
+       
+
 	printf("options parsed, good to GO!\n");
 	exit(EXIT_SUCCESS);
+}
+
+struct addrinfo *
+lookup_host(const char *address)
+{
+	const char *colon = strchr(address, ':');
+	if (!colon) {
+		fprintf(stderr, "missing : in host/port name\n");
+		return NULL;
+	}
+
+	char *name = alloca(colon - address + 1);
+	char *port = alloca(strlen(colon));
+
+	memcpy(name, address, colon - address);
+	name[colon - address] = 0;
+	strcpy(port, colon + 1);
+	
+	struct addrinfo hints;
+	memset(&hints, 0, sizeof hints);
+	hints.ai_family = PF_UNSPEC;
+	hints.ai_socktype = SOCK_STREAM;
+	hints.ai_protocol = IPPROTO_TCP; /* probably doesn't matter */
+	hints.ai_flags = AI_ADDRCONFIG; /* Only get ipv4/ipv6 if we have
+					   configured interfaces for them */
+	struct addrinfo *res;
+	int error = getaddrinfo(name, port, &hints, &res);
+	if (error) {
+		fprintf(stderr, "Resolver error: %s", gai_strerror(error));
+		return NULL;
+	}
+	return res;
 }
 
 static void

@@ -8,11 +8,14 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <netdb.h>
+#include <errno.h>
 
 static void usage(const char *name);
 struct addrinfo *lookup_host(const char *address);
-static void print_addresses(struct addrinfo *ai);
+static void print_addresses(const struct addrinfo *ai);
 static void parse_arguments(int argc, char **argv);
+static int test_connection(const struct addrinfo *addr);
+static const char *lookup_addrinfo(const struct addrinfo *, char *host, size_t hostlen, char *port, size_t portlen);
 
 static int loop_mode = 0;
 static int random_mode = 0;
@@ -32,11 +35,57 @@ main(int argc, char **argv)
 		exit(EXIT_FAILURE);
 	}
 	print_addresses(res);
+	
+	if (test_connection(res) != 0) {
+		fprintf(stderr, "Cannot connect to benchmark server, aborting.\n");
+		exit(EXIT_FAILURE);
+	}
+
 	freeaddrinfo(res);
 
 	printf("options parsed, good to GO!\n");
 	
 	exit(EXIT_SUCCESS);
+}
+
+static int
+test_connection(const struct addrinfo *addr)
+{
+	int fd = socket(addr->ai_family, SOCK_STREAM, addr->ai_protocol);
+	if (fd == -1) {
+		fprintf(stderr, "test_connection: socket(%d, %d, %d): %s\n",
+			addr->ai_family, addr->ai_protocol, SOCK_STREAM,
+			strerror(errno));
+		return -1;
+	}
+	char host[NI_MAXHOST];
+	char port[NI_MAXSERV];
+	lookup_addrinfo(addr, host, sizeof host, port, sizeof port);
+	printf("Testing connection to %s:%s...\n", host, port);
+								 
+	int error = connect(fd, addr->ai_addr, addr->ai_addrlen);
+	if (error == -1) {
+		fprintf(stderr, "Failed to connect: %s\n", strerror(errno));
+		goto out;
+	}
+	fprintf(stderr, "Connection OK.\n");
+ out:
+	close(fd);
+	return error;
+}
+
+static const char *
+lookup_addrinfo(const struct addrinfo *ai, char *host, size_t hostlen, char *port, size_t portlen)
+{
+	
+	int error = getnameinfo(ai->ai_addr, ai->ai_addrlen, host, hostlen,
+				port, portlen, NI_NUMERICHOST | NI_NUMERICSERV);
+	if (error) {
+		strlcpy(host, "(invalid)", hostlen);
+		strlcpy(port, "(invalid)", portlen);
+	}
+
+	return host; /* To make this friendly in printf() statements */
 }
 
 static void
@@ -87,7 +136,7 @@ parse_arguments(int argc, char **argv)
 }
 
 static void
-print_addresses(struct addrinfo *ai)
+print_addresses(const struct addrinfo *ai)
 {
 	char host[NI_MAXHOST];
 	char service[NI_MAXSERV];

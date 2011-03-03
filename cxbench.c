@@ -67,8 +67,8 @@ test_connection(const struct addrinfo *addr)
 	printf("Testing connection to %s:%s...\n", host, port);
 	
 	double t1 = now();
-	int error = connect(fd, addr->ai_addr, addr->ai_addrlen);
-	if (error == -1) {
+	int connect_status = connect(fd, addr->ai_addr, addr->ai_addrlen);
+	if (connect_status == -1) {
 		fprintf(stderr, "Failed to connect: %s\n", strerror(errno));
 		goto out;
 	}
@@ -76,7 +76,7 @@ test_connection(const struct addrinfo *addr)
 	fprintf(stderr, "Connection OK in %.3fms.\n", 1e3 * (t2 - t1));
  out:
 	close(fd);
-	return error;
+	return connect_status;
 }
 
 static int

@@ -26,6 +26,7 @@ static void randomize_query_list();
 static void initiate_query(const char *hostname, const struct addrinfo *target, const char *query);
 static void wait_for_action(void);
 static void wait_for_connected(int fd);
+static void unregister_wait(int fd);
 
 static double now(void);
 
@@ -34,6 +35,11 @@ query_function select_query_function(void);
 static size_t next_random_query(void);
 static size_t next_loop_query(void);
 static size_t next_query_noloop(void);
+
+typedef int (*event_handler)(int);
+static int handle_connected(int);
+static int handle_readable(int);
+
 
 static int loop_mode = 0;
 static int random_mode = 0;
@@ -49,6 +55,7 @@ static struct conn_info {
 	const char *query;
 	const struct addrinfo *target;
 	const char *hostname;
+	event_handler handler;
 	unsigned int pending_index;
 } *connection_info;
 
@@ -287,6 +294,7 @@ initiate_query(const char *hostname, const struct addrinfo *target, const char *
 	connection_info[fd].target = target;
 	connection_info[fd].hostname = hostname;
 	connection_info[fd].pending_index = pending_queries;
+	connection_info[fd].handler = handle_connected;
 	int error = connect(fd, target->ai_addr, target->ai_addrlen);
 	if (error == -1) {
 		if (errno != EINPROGRESS) {
@@ -310,13 +318,42 @@ wait_for_connected(int fd)
 	pending_list[pending_queries].events = POLLOUT;
 }
 
+#define SWAP(a, b)				\
+do {						\
+	__typeof(a) tmp = (a);			\
+	(a) = (b);				\
+	(b) = tmp;				\
+} while (0)
+
+static void
+unregister_wait(int fd)
+{
+	const struct conn_info *conn = &connection_info[fd];
+	if (conn->pending_index != pending_queries - 1) {
+		int ix1 = conn->pending_index;
+		int ix2 = pending_queries - 1;
+		connection_info[ix2].pending_index = ix1;
+		SWAP(pending_list[ix1], pending_list[ix2]);
+	}
+	pending_queries--;
+}
+
 static void
 wait_for_action(void)
 {
 	fprintf(stderr, "[debug] polling for %d fds\n", pending_queries);
 	int num_fds = poll(pending_list, pending_queries, -1);
 	fprintf(stderr, "[debug] %d fds ready for something\n", num_fds);
-	exit(EXIT_SUCCESS);
+
+	unsigned int n;
+	for (n = 0; num_fds && n < pending_queries; n++) {
+		struct pollfd *p = &pending_list[n];
+		if (p->revents) {
+			int fd = p->fd;
+			connection_info[fd].handler(fd);
+			num_fds--;
+		}
+	}
 }
 
 query_function
@@ -333,12 +370,6 @@ select_query_function(void)
 }
 
 
-#define SWAP(a, b)				\
-do {						\
-	__typeof(a) tmp = (a);			\
-	(a) = (b);				\
-	(b) = tmp;				\
-} while (0)
 
 static void
 randomize_query_list()

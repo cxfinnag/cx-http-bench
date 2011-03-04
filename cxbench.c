@@ -459,9 +459,65 @@ generate_query(char *buf, size_t buf_len, const char *host, const char *query)
 				      "GET %s%s HTTP/1.1\r\n"
 				      "Host: %s\r\n"
 				      "Connection: close\r\n\r\n", query_prefix, query, host);
-	return MIN((sizeof buf) - 1, would_write);
+	return MIN(buf_len - 1, would_write);
 }
 
+
+static int
+handle_connected(int fd)
+{
+	struct conn_info *conn = &connection_info[fd];
+	fprintf(stderr, "[debug] fd %d is now connected\n", fd);
+	conn->connected_time = now();
+	conn->first_result_time = 0;
+	conn->finished_result_time = 0;
+	
+	char buffer[20000];
+	size_t len = generate_query(buffer, sizeof buffer, conn->hostname, conn->query);
+
+	ssize_t written = write(fd, buffer, len);
+	int saved_errno = errno;
+	if (written == -1) {
+		fprintf(stderr, "Write to fd %d fails: %s\n", fd, strerror(errno));
+		close(fd);
+		unregister_wait(fd);
+		errno = saved_errno;
+		return -1;
+	}
+	if ((size_t)written != len) {
+		/* @@@ TODO eventually we should handle this to support queries that are longer
+		   than the socket buffer */
+		fprintf(stderr, "Short write to fd %d: %llu/%llu, aborting query\n",
+			fd, (unsigned long long)written, (unsigned long long)len);
+		close(fd);
+		unregister_wait(fd);
+		errno = EWOULDBLOCK;
+		return -1;
+	}
+	buffer[len] = 0;
+	fprintf(stderr, "[debug] Wrote to fd %d %d bytes: 'Get %s...'\n", fd, (int)written,
+		conn->query);
+	
+	conn->handler = handle_readable;
+	pending_list[conn->pending_index].events = POLLIN;
+	fprintf(stderr, "[debug] pending_list[%d].events = POLLIN\n", conn->pending_index);
+	return 0;
+}
+
+static int
+handle_readable(int fd)
+{
+	struct conn_info *conn = &connection_info[fd];
+	fprintf(stderr, "[debug] fd %d is now readable\n", fd);
+	
+	if (!conn->first_result_time)
+		conn->first_result_time = now();
+	
+	char buf[4000];
+	read(fd, buf, sizeof buf);
+	/* @@@ continue here */
+	
+}
 
 static void
 usage(const char *name)

@@ -11,6 +11,8 @@
 #include <errno.h>
 #include <sys/time.h>
 #include <math.h>
+#include <fcntl.h>
+#include <poll.h>
 
 static void usage(const char *name);
 struct addrinfo *lookup_host(const char *address);
@@ -20,13 +22,37 @@ const struct addrinfo *select_address(const struct addrinfo *addr);
 static int lookup_addrinfo(const struct addrinfo *, char *host, size_t hostlen, char *port, size_t portlen);
 static void run_benchmark(const char *hostname, const struct addrinfo *addr);
 static void read_queries(void);
+static void randomize_query_list();
+static void initiate_query(const char *hostname, const struct addrinfo *target, const char *query);
+static void wait_for_action(void);
+static void wait_for_connected(int fd);
 
-static double now();
+static double now(void);
+
+typedef size_t (*query_function)(void);
+query_function select_query_function(void);
+static size_t next_random_query(void);
+static size_t next_loop_query(void);
+static size_t next_query_noloop(void);
 
 static int loop_mode = 0;
 static int random_mode = 0;
-static int num_parallell = 1;
+static unsigned int num_parallell = 1;
 static const char *query_prefix = "";
+
+static struct conn_info {
+	double connect_time;
+	double connected_time;
+	double first_result_time;
+	double finished_result_time;
+
+	const char *query;
+	const struct addrinfo *target;
+	const char *hostname;
+	unsigned int pending_index;
+} *connection_info;
+
+static struct pollfd *pending_list;
 
 int
 main(int argc, char **argv)
@@ -215,13 +241,137 @@ static double now()
 static size_t num_queries = 0;
 static char *queries = 0;
 static char **query_list = 0;
+static unsigned int pending_queries = 0;
 
 static void
 run_benchmark(const char *hostname, const struct addrinfo *target)
 {
+	size_t (*fn)(void) = select_query_function();
+	connection_info = malloc((num_parallell + 20) * sizeof connection_info[0]);
+	pending_list = malloc(num_parallell * sizeof(pending_list[0]));
+
 	read_queries();
-	
-	
+	while (pending_queries + num_parallell > 0) {
+		if (pending_queries < num_parallell) {
+			/* Using if and not while here so we do not immediately start
+			   a lot of connects */
+			size_t query_index = fn();
+			if (query_index == (size_t)-1) {
+				num_parallell = 0;
+				fprintf(stderr, "Finished sending queries\n");
+				break;
+			}
+			initiate_query(hostname, target, query_list[query_index]);
+		}
+ 		wait_for_action();
+	}
+}
+
+static void
+initiate_query(const char *hostname, const struct addrinfo *target, const char *query)
+{
+	int fd = socket(target->ai_family, SOCK_STREAM, target->ai_protocol);
+	if (fd == -1) {
+		fprintf(stderr, "initiate_query: socket() fails: %s\n", strerror(errno));
+		exit(EXIT_FAILURE);
+	}
+
+	/* Make sure socket is nonblocking, we don't want to wait! */
+	if (fcntl(fd, F_SETFL, fcntl(fd, F_GETFL) | O_NONBLOCK) == -1) {
+		fprintf(stderr, "initiate_query: fcntl fails: %s", strerror(errno));
+		exit(EXIT_FAILURE);
+	}
+
+	connection_info[fd].connect_time = now();
+	connection_info[fd].query = query;
+	connection_info[fd].target = target;
+	connection_info[fd].hostname = hostname;
+	connection_info[fd].pending_index = pending_queries;
+	int error = connect(fd, target->ai_addr, target->ai_addrlen);
+	if (error == -1) {
+		if (errno != EINPROGRESS) {
+			fprintf(stderr, "connect fails immediately: %s\n", strerror(errno));
+			exit(EXIT_FAILURE);
+		} else {
+			fprintf(stderr, "[debug] connect on fd %d in progress\n", fd);
+		}
+	} else {
+		fprintf(stderr, "[debug] connect on fd %d connected immediately!\n", fd);
+	}
+	wait_for_connected(fd);
+	pending_queries++;
+}
+
+static void
+wait_for_connected(int fd)
+{
+	memset(&pending_list[pending_queries], 0, sizeof pending_list[pending_queries]);
+	pending_list[pending_queries].fd = fd;
+	pending_list[pending_queries].events = POLLOUT;
+}
+
+static void
+wait_for_action(void)
+{
+	fprintf(stderr, "[debug] polling for %d fds\n", pending_queries);
+	int num_fds = poll(pending_list, pending_queries, -1);
+	fprintf(stderr, "[debug] %d fds ready for something\n", num_fds);
+	exit(EXIT_SUCCESS);
+}
+
+query_function
+select_query_function(void)
+{
+ 	if (loop_mode) {
+		if (random_mode)
+			return next_random_query;
+		return next_loop_query;
+	}
+	if (random_mode)
+		randomize_query_list();
+	return next_query_noloop;
+}
+
+
+#define SWAP(a, b)				\
+do {						\
+	__typeof(a) tmp = (a);			\
+	(a) = (b);				\
+	(b) = tmp;				\
+} while (0)
+
+static void
+randomize_query_list()
+{
+	size_t n;
+	for (n = 0; n < num_queries - 1; n++) {
+		size_t idx = n + drand48() * (num_queries - n);
+		SWAP(queries[n], queries[idx]);
+	}
+}
+
+static size_t 
+next_random_query()
+{
+	return drand48() * num_queries;
+}
+
+static size_t
+next_loop_query()
+{
+	static size_t idx;
+	if (idx >= num_queries)
+		idx = 0;
+	return idx++;
+}
+
+static size_t
+next_query_noloop()
+{
+	static size_t idx;
+	if (idx >= num_queries)
+		return (size_t)-1;
+	return idx++;
 }
 
 static double

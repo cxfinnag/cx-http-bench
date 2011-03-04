@@ -1,3 +1,16 @@
+/*
+ * cxbench
+ * 
+ * A benchmarking tool for benchmarking HTTP services.
+ *
+ * Written by Finn Arne Gangstad <finnag@cxense.com>
+ *
+ * Copyright (C) 2011 cXense AS
+ *
+ * License: GPL V2
+ *
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 

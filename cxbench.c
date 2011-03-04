@@ -15,7 +15,7 @@ static void usage(const char *name);
 struct addrinfo *lookup_host(const char *address);
 static void print_addresses(const struct addrinfo *ai);
 static void parse_arguments(int argc, char **argv);
-static int test_connection(const struct addrinfo *addr);
+const struct addrinfo *select_address(const struct addrinfo *addr);
 static int lookup_addrinfo(const struct addrinfo *, char *host, size_t hostlen, char *port, size_t portlen);
 
 static double now();
@@ -28,7 +28,7 @@ int
 main(int argc, char **argv)
 {
 	parse_arguments(argc, argv);
-
+	
 	argc -= optind;
 	argv += optind;
 
@@ -39,7 +39,8 @@ main(int argc, char **argv)
 	}
 	print_addresses(res);
 	
-	if (test_connection(res) != 0) {
+	const struct addrinfo *target = select_address(res);
+	if (!target) {
 		fprintf(stderr, "Cannot connect to benchmark server, aborting.\n");
 		exit(EXIT_FAILURE);
 	}
@@ -51,33 +52,41 @@ main(int argc, char **argv)
 	exit(EXIT_SUCCESS);
 }
 
-static int
-test_connection(const struct addrinfo *addr)
+const struct addrinfo *
+select_address(const struct addrinfo *ai)
 {
-	int fd = socket(addr->ai_family, SOCK_STREAM, addr->ai_protocol);
-	if (fd == -1) {
-		fprintf(stderr, "test_connection: socket(%d, %d, %d): %s\n",
-			addr->ai_family, addr->ai_protocol, SOCK_STREAM,
-			strerror(errno));
-		return -1;
-	}
-	char host[NI_MAXHOST];
-	char port[NI_MAXSERV];
-	lookup_addrinfo(addr, host, sizeof host, port, sizeof port);
-	printf("Testing connection to %s:%s...\n", host, port);
+	/* Go through all the addresses in ai, ai->next... and find one we can connect to.
+	   Return the first one that answers, or NULL if connection fails to all of them. */
+	for (; ai; ai = ai->ai_next) {
+		int fd = socket(ai->ai_family, SOCK_STREAM, ai->ai_protocol);
+		if (fd == -1) {
+			fprintf(stderr, "test_connection: socket(%d, %d, %d): %s\n",
+				ai->ai_family, ai->ai_protocol, SOCK_STREAM,
+				strerror(errno));
+			continue;
+		}
+
+		char host[NI_MAXHOST];
+		char port[NI_MAXSERV];
+		lookup_addrinfo(ai, host, sizeof host, port, sizeof port);
+		printf("Testing connection to %s:%s...\n", host, port);
 	
-	double t1 = now();
-	int connect_status = connect(fd, addr->ai_addr, addr->ai_addrlen);
-	if (connect_status == -1) {
-		fprintf(stderr, "Failed to connect: %s\n", strerror(errno));
-		goto out;
+		double t1 = now();
+		int connect_status = connect(fd, ai->ai_addr, ai->ai_addrlen);
+		int saved_errno = errno;
+		close(fd);
+
+		if (connect_status == 0) {
+			double t2 = now();
+			fprintf(stderr, "Connection OK in %.3fms.\n", 1e3 * (t2 - t1));
+			return ai;
+		}
+			
+		fprintf(stderr, "Failed to connect: %s\n", strerror(saved_errno));
 	}
-	double t2 = now();
-	fprintf(stderr, "Connection OK in %.3fms.\n", 1e3 * (t2 - t1));
- out:
-	close(fd);
-	return connect_status;
+	return NULL;
 }
+
 
 static int
 lookup_addrinfo(const struct addrinfo *ai, char *host, size_t hostlen, char *port, size_t portlen)

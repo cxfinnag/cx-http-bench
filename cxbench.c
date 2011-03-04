@@ -167,18 +167,19 @@ lookup_host(const char *address)
 		return NULL;
 	}
 
-	char *name = alloca(colon - address + 1);
-	char *port = alloca(strlen(colon));
+	size_t name_len = colon - address + 1;
+	char *name = alloca(name_len);
+	strlcpy(name, address, name_len);
 
-	memcpy(name, address, colon - address);
-	name[colon - address] = 0;
-	strcpy(port, colon + 1);
+	size_t port_len = strlen(colon);
+	char *port = alloca(port_len);
+	strlcpy(port, colon + 1, port_len);
 	
 	struct addrinfo hints;
 	memset(&hints, 0, sizeof hints);
 	hints.ai_family = PF_UNSPEC;
 	hints.ai_socktype = SOCK_STREAM;
-	hints.ai_protocol = IPPROTO_TCP; /* probably doesn't matter */
+	hints.ai_protocol = IPPROTO_TCP; /* matters for ports 512..520 or so */
 	hints.ai_flags = AI_ADDRCONFIG; /* Only get ipv4/ipv6 if we have
 					   configured interfaces for them */
 	struct addrinfo *res;

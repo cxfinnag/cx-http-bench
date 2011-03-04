@@ -10,6 +10,7 @@
 #include <netdb.h>
 #include <errno.h>
 #include <sys/time.h>
+#include <math.h>
 
 static void usage(const char *name);
 struct addrinfo *lookup_host(const char *address);
@@ -219,8 +220,22 @@ static void
 run_benchmark(const char *hostname, const struct addrinfo *target)
 {
 	read_queries();
+	
+	
 }
 
+static double
+poisson_wait()
+{
+	/* Return the number of time units to wait for the next event in a Poisson process
+	   with expected value 1 */
+	double r = drand48();
+	if (r < 1e-15) {
+		/* Values should be 0, 35527e-15 * N, N = 1, 2, ... 2 ^ 48 */
+		r = 1e-15; /* protect against zero value */
+	}
+	return -log(1.0 - r);
+}
 
 static void
 read_queries()

@@ -25,6 +25,7 @@ static double now();
 static int loop_mode = 0;
 static int random_mode = 0;
 static int num_parallell = 1;
+static const char *query_prefix = "";
 
 int
 main(int argc, char **argv)
@@ -111,6 +112,7 @@ parse_arguments(int argc, char **argv)
 		{ "loop", no_argument, NULL, 'l' },
 		{ "randomize", no_argument, NULL, 'r' },
 		{ "parallell", required_argument, NULL, 'p' },
+		{ "query-prefix", required_argument, NULL, 'q' },
 		{ NULL, 0, NULL, 0 }
 	};
 
@@ -131,8 +133,8 @@ parse_arguments(int argc, char **argv)
 				exit(EXIT_FAILURE);
 			}
 			break;
-		case '0':
-			printf("uh huh how did we get here: gol = 0\n");
+		case 'q':
+			query_prefix = strdup(optarg);
 			break;
 		default:
 			usage(argv[0]);
@@ -274,11 +276,26 @@ read_queries()
 	for (n = 0; n < num_queries; n++) {
 		query_list[n] = s;
 		s = memchr(s, '\n', end - s);
-		if (s) {
-			*s = 0;
-			s++;
+		if (!s) {
+			s = end;
 		}
+		*s = 0;
+		s++;
 	}
+}
+
+#ifndef MIN
+#define MIN(a,b) ((a) < (b) ? (a) : (b))
+#endif
+
+size_t
+generate_query(char *buf, size_t buf_len, const char *host, const char *query)
+{
+	size_t would_write = snprintf(buf, buf_len,
+				      "GET %s%s HTTP/1.1\r\n"
+				      "Host: %s\r\n"
+				      "Connection: close\r\n\r\n", query_prefix, query, host);
+	return MIN((sizeof buf) - 1, would_write);
 }
 
 
@@ -288,7 +305,8 @@ usage(const char *name)
 	fprintf(stderr, "Usage: %s [OPTIONS] host:port\n\n"
 		" -l --loop-mode : Run the same queries multple times\n"
 		" -r --random-mode: Run the queries in random order\n"
-		" -p --parallell <n>: Run <n> queries in parallell\n\n"
+		" -p --parallell <n>: Run <n> queries in parallell\n"
+		" -q --query-prefix <prefix> : Prepend <prefix> to all queries\n\n"
 		"A list of queries must be given on STDIN.\n\n", name);
 }
 

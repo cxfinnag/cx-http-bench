@@ -17,7 +17,7 @@ static void print_addresses(const struct addrinfo *ai);
 static void parse_arguments(int argc, char **argv);
 const struct addrinfo *select_address(const struct addrinfo *addr);
 static int lookup_addrinfo(const struct addrinfo *, char *host, size_t hostlen, char *port, size_t portlen);
-static void run_benchmark(const struct addrinfo *addr);
+static void run_benchmark(const char *hostname, const struct addrinfo *addr);
 static void read_queries(void);
 
 static double now();
@@ -48,7 +48,7 @@ main(int argc, char **argv)
 		exit(EXIT_FAILURE);
 	}
 
-	run_benchmark(target);
+	run_benchmark(argv[0], target);
 	
 	freeaddrinfo(res);
 	
@@ -216,20 +216,19 @@ static char *queries = 0;
 static char **query_list = 0;
 
 static void
-run_benchmark(const struct addrinfo *target)
+run_benchmark(const char *hostname, const struct addrinfo *target)
 {
 	read_queries();
 }
 
 
-enum {
-	BYTES_PER_READ = 16384
-};
 static void
 read_queries()
 {
+	/* Read all the queries from stdin into an array. */
 	size_t queries_alloc = 0;
 	size_t queries_pos = 0;
+	enum { BYTES_PER_READ = 16384 };
 
 	while (1) {
 		if (BYTES_PER_READ + queries_pos >= queries_alloc) {

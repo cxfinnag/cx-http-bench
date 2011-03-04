@@ -1,4 +1,3 @@
-
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -545,10 +544,32 @@ handle_readable(int fd)
 		conn->first_result_time = now();
 	
 	char buf[4000];
-	read(fd, buf, sizeof buf);
-	/* @@@ continue here */
+	int len;
+	while ((len = read(fd, buf, (sizeof buf) - 1)) > 0) {
+		buf[len] = 0;
+		fprintf(stderr, "[debug] got %d bytes from fd %dl '%s'\n", len, fd, buf);
+	}
+	if (len == 0) {
+		conn->finished_result_time = now();
+		fprintf(stderr, "[debug] EOF on fd %d\n", fd);
+		fprintf(stderr, "TC=%.1fms T1=%.1fms TF=%.1fms Q=\"%s\"\n",
+			1e3 * (conn->connected_time - conn->connect_time),
+			1e3 * (conn->first_result_time - conn->connect_time),
+			1e3 * (conn->finished_result_time - conn->connect_time),
+			conn->query);
+	} else if (len == -1) {
+		if (errno == EWOULDBLOCK) {
+			fprintf(stderr, "[debug] must wait for more data from fd %d\n", fd);
+			return 1; /* must return and wait for more data */
+		}
+		fprintf(stderr, "[debug] Read error on fd %d: %s\n", fd, strerror(errno));
+	}
 	
+	unregister_wait(fd);
+	close(fd);
+	return len;
 }
+
 
 static void
 usage(const char *name)

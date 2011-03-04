@@ -17,6 +17,8 @@ static void print_addresses(const struct addrinfo *ai);
 static void parse_arguments(int argc, char **argv);
 const struct addrinfo *select_address(const struct addrinfo *addr);
 static int lookup_addrinfo(const struct addrinfo *, char *host, size_t hostlen, char *port, size_t portlen);
+static void run_benchmark(const struct addrinfo *addr);
+static void read_queries(void);
 
 static double now();
 
@@ -45,9 +47,9 @@ main(int argc, char **argv)
 		exit(EXIT_FAILURE);
 	}
 
+	run_benchmark(target);
+	
 	freeaddrinfo(res);
-
-	printf("options parsed, good to GO!\n");
 	
 	exit(EXIT_SUCCESS);
 }
@@ -206,6 +208,79 @@ static double now()
 	gettimeofday(&tv, NULL);
 	return tv.tv_sec + 1e-6 * tv.tv_usec;
 }
+
+static size_t num_queries = 0;
+static char *queries = 0;
+static char **query_list = 0;
+
+static void
+run_benchmark(const struct addrinfo *target)
+{
+	read_queries();
+}
+
+
+enum {
+	BYTES_PER_READ = 16384
+};
+static void
+read_queries()
+{
+	size_t queries_alloc = 0;
+	size_t queries_pos = 0;
+
+	while (1) {
+		if (BYTES_PER_READ + queries_pos >= queries_alloc) {
+			/* >= to keep room for a potential added trailing 0 */
+			queries_alloc += BYTES_PER_READ + queries_alloc;
+			queries = realloc(queries, queries_alloc);
+			if (!queries) {
+				fprintf(stderr, "Failed to allocate %llu bytes: %s\n",
+					(unsigned long long)queries_alloc, strerror(errno));
+				exit(EXIT_FAILURE);
+			}
+		}
+					 
+		ssize_t l = read(0, queries + queries_pos, BYTES_PER_READ);
+		if (l == -1) {
+			fprintf(stderr, "Read error on stdin: %s\n", strerror(errno));
+			exit(EXIT_FAILURE);
+		}
+		if (l == 0)
+			break;
+		queries_pos += l;
+	}
+	realloc(queries, queries_pos + 1); /* Shrink the allocation when done reading */
+	fprintf(stderr, "Read %llu bytes of queries\n", (unsigned long long)queries_pos);
+	
+	char *s;
+	char *end = &queries[queries_pos];
+	for (s = memchr(queries, '\n', end - queries); s; s = memchr(s + 1, '\n', end - (s + 1))) {
+		num_queries++;
+	}
+	if (queries[queries_pos - 1] != '\n') {
+		fprintf(stderr, "Last line did not have a newline, adding additional line.\n");
+		++num_queries;
+	}
+	fprintf(stderr, " - found %llu queries\n", (unsigned long long)num_queries);
+	query_list = malloc(num_queries * sizeof(query_list[0]));
+	if (!query_list) {
+		fprintf(stderr, "Failed to allocate memory for query list: %s\n", strerror(errno));
+		exit(EXIT_FAILURE);
+	}
+
+	size_t n;
+	s = queries;
+	for (n = 0; n < num_queries; n++) {
+		query_list[n] = s;
+		s = memchr(s, '\n', end - s);
+		if (s) {
+			*s = 0;
+			s++;
+		}
+	}
+}
+
 
 static void
 usage(const char *name)

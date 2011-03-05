@@ -305,12 +305,14 @@ static char *queries = 0;
 static char **query_list = 0;
 static unsigned int pending_queries = 0;
 
+enum { MAX_FD_HEADROOM = 20 };
+
 static void
 run_benchmark(const char *hostname, const struct addrinfo *target)
 {
 	size_t (*fn)(void) = select_query_function();
-	connection_info = malloc((num_parallell + 20) * sizeof connection_info[0]);
-	pending_list = malloc(num_parallell * sizeof(pending_list[0]));
+	connection_info = calloc(num_parallell + MAX_FD_HEADROOM, sizeof connection_info[0]);
+	pending_list = calloc(num_parallell, sizeof(pending_list[0]));
 
 	read_queries();
 	while (pending_queries + num_parallell > 0) {

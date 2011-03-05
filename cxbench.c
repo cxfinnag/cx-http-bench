@@ -567,15 +567,19 @@ handle_readable(int fd)
 	if (!conn->first_result_time)
 		conn->first_result_time = now();
 	
-	char buf[4000];
 	int len;
-	while ((len = read(fd, buf, (sizeof buf) - 1)) > 0) {
-		buf[len] = 0;
-		fprintf(stderr, "[debug] got %d bytes from fd %dl '%s'\n", len, fd, buf);
-	}
+	enum { BYTES_PER_NETWORK_READ = 4000 };
+	do {
+		dynbuf_set_reserve(&conn->data, BYTES_PER_NETWORK_READ);
+		len = read(fd, conn->data.buffer + conn->data.pos, BYTES_PER_NETWORK_READ);
+		if (len > 0) {
+			conn->data.pos += len;
+			fprintf(stderr, "[debug] got %d bytes from fd %d\n", len, fd);
+		}
+	} while (len > 0);
 	if (len == 0) {
 		conn->finished_result_time = now();
-		fprintf(stderr, "[debug] EOF on fd %d\n", fd);
+		fprintf(stderr, "[debug] EOF on fd %d. Total length = %d\n", fd, (int)conn->data.pos);
 		fprintf(stderr, "TC=%.1fms T1=%.1fms TF=%.1fms Q=\"%s\"\n",
 			1e3 * (conn->connected_time - conn->connect_time),
 			1e3 * (conn->first_result_time - conn->connect_time),

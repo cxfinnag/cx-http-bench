@@ -65,6 +65,18 @@ do {							\
 	}						\
 } while(0)
 
+#define rt_assert(x)							\
+do {									\
+	if (!(x)) {							\
+		fprintf(stderr, "%s:%d %s ASSERT FAILURE %s - PAUSING\n", __FILE__, __LINE__, \
+			__PRETTY_FUNCTION__, #x);			\
+		while (1) {						\
+			pause();					\
+			sleep(1);					\
+		}							\
+	}								\
+} while (0);
+
 static int loop_mode = 0;
 static int random_mode = 0;
 static unsigned int num_parallell = 1;

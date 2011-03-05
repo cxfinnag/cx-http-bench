@@ -70,6 +70,14 @@ static int random_mode = 0;
 static unsigned int num_parallell = 1;
 static const char *query_prefix = "";
 
+enum conn_info_status {
+	CONN_UNUSED = 0, /* Should be 0 for easy memset cleaning of all statuses */
+	CONN_CONNECTING,
+	CONN_CONNECTED,
+	CONN_WAITING_RESULT,
+	CONN_MORE_RESULTS
+};
+
 static struct conn_info {
 	double connect_time;
 	double connected_time;
@@ -81,6 +89,7 @@ static struct conn_info {
 	const char *hostname;
 	event_handler handler;
 	unsigned int pending_index;
+	enum conn_info_status status;
 
 	struct dynbuf data;
 } *connection_info;
@@ -325,6 +334,7 @@ initiate_query(const char *hostname, const struct addrinfo *target, const char *
 
 	struct conn_info *conn = &connection_info[fd];
 	conn->connect_time = now();
+	conn->status = CONN_CONNECTING;
 	conn->query = query;
 	conn->target = target;
 	conn->hostname = hostname;
@@ -537,6 +547,7 @@ handle_connected(int fd)
 {
 	struct conn_info *conn = &connection_info[fd];
 	debug("fd %d is now connected\n", fd);
+	conn->status = CONN_CONNECTED;
 	conn->connected_time = now();
 	conn->first_result_time = 0;
 	conn->finished_result_time = 0;
@@ -548,6 +559,7 @@ handle_connected(int fd)
 	int saved_errno = errno;
 	if (written == -1) {
 		fprintf(stderr, "Write to fd %d fails: %s\n", fd, strerror(errno));
+		conn->status = CONN_UNUSED;
 		close(fd);
 		unregister_wait(fd);
 		errno = saved_errno;

@@ -33,6 +33,7 @@ void dynbuf_init(struct dynbuf *);
 void dynbuf_free(struct dynbuf *);
 void dynbuf_set_reserve(struct dynbuf *, size_t n); /* Make room for n more bytes */
 void dynbuf_store(struct dynbuf *, const char *, size_t n); /* Store <n> bytes into dynbuf */
+void dynbuf_shrink(struct dynbuf *); /* Shrink the allocation to exactly fit what is in the dynbuf */
 
 #endif /* !DYNBUF_H */
 

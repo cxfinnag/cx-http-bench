@@ -64,6 +64,17 @@ dynbuf_store(struct dynbuf *d, const char *buf, size_t n)
 	d->pos += n;
 }
 
+void
+dynbuf_shrink(struct dynbuf *d)
+{
+	char *s = realloc(d->buffer, d->pos);
+	if (s) {
+		d->buffer = s;
+		d->alloc = d->pos;
+	}
+};
+
+
 /* Local Variables: */
 /* c-basic-offset:8 */
 /* indent-tabs-mode:t */

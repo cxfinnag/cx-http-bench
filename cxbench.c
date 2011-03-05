@@ -55,11 +55,11 @@ static void unregister_wait(int fd);
 
 static double now(void);
 
-typedef size_t (*query_function)(void);
+typedef const char *(*query_function)(void);
 query_function select_query_function(void);
-static size_t next_random_query(void);
-static size_t next_loop_query(void);
-static size_t next_query_noloop(void);
+static const char *next_random_query(void);
+static const char *next_loop_query(void);
+static const char *next_query_noloop(void);
 
 typedef int (*event_handler)(int);
 static int handle_connected(int);
@@ -312,7 +312,7 @@ static double now()
 }
 
 static size_t num_queries = 0;
-static char *queries = 0;
+static char *queries_buffer = 0;
 static char **query_list = 0;
 static unsigned int pending_queries = 0;
 
@@ -321,7 +321,7 @@ enum { MAX_FD_HEADROOM = 20 };
 static void
 run_benchmark(const char *hostname, const struct addrinfo *target)
 {
-	size_t (*fn)(void) = select_query_function();
+	query_function fn = select_query_function();
 	connection_info = calloc(num_parallell + MAX_FD_HEADROOM, sizeof connection_info[0]);
 	pending_list = calloc(num_parallell, sizeof(pending_list[0]));
 
@@ -330,13 +330,13 @@ run_benchmark(const char *hostname, const struct addrinfo *target)
 		unsigned int n;
 		enum { MAX_CONNS_IN_ONE_SHOT = 3 }; /* Avoid going bananas with connections */
 		for (n = 0; pending_queries < num_parallell && n < MAX_CONNS_IN_ONE_SHOT; n++) {
-			size_t query_index = fn();
-			if (query_index == (size_t)-1) {
+			const char *query = fn();
+			if (!query) {
 				num_parallell = 0;
 				fprintf(stderr, "Finished sending queries\n");
 				break;
 			}
-			initiate_query(hostname, target, query_list[query_index]);
+			initiate_query(hostname, target, query);
 		}
  		wait_for_action();
 	}
@@ -456,32 +456,33 @@ randomize_query_list()
 	size_t n;
 	for (n = 0; n < num_queries - 1; n++) {
 		size_t idx = n + drand48() * (num_queries - n);
-		SWAP(queries[n], queries[idx]);
+		SWAP(query_list[n], query_list[idx]);
 	}
 }
 
-static size_t 
+static const char *
 next_random_query()
 {
-	return drand48() * num_queries;
+	unsigned int idx = drand48() * num_queries;
+	return query_list[idx];
 }
 
-static size_t
+static const char *
 next_loop_query()
 {
 	static size_t idx;
 	if (idx >= num_queries)
 		idx = 0;
-	return idx++;
+	return query_list[idx++];
 }
 
-static size_t
+static const char *
 next_query_noloop()
 {
 	static size_t idx;
 	if (idx >= num_queries)
-		return (size_t)-1;
-	return idx++;
+		return NULL;
+	return query_list[idx++];
 }
 
 static double
@@ -509,15 +510,15 @@ read_queries()
 		if (BYTES_PER_READ + queries_pos >= queries_alloc) {
 			/* >= to keep room for a potential added trailing 0 */
 			queries_alloc += BYTES_PER_READ + queries_alloc;
-			queries = realloc(queries, queries_alloc);
-			if (!queries) {
+			queries_buffer = realloc(queries_buffer, queries_alloc);
+			if (!queries_buffer) {
 				fprintf(stderr, "Failed to allocate %llu bytes: %s\n",
 					(unsigned long long)queries_alloc, strerror(errno));
 				exit(EXIT_FAILURE);
 			}
 		}
 					 
-		ssize_t l = read(0, queries + queries_pos, BYTES_PER_READ);
+		ssize_t l = read(0, queries_buffer + queries_pos, BYTES_PER_READ);
 		if (l == -1) {
 			fprintf(stderr, "Read error on stdin: %s\n", strerror(errno));
 			exit(EXIT_FAILURE);
@@ -526,16 +527,18 @@ read_queries()
 			break;
 		queries_pos += l;
 	}
-	char *q = realloc(queries, queries_pos + 1); /* Shrink the allocation when done reading */
-	queries = q ? q : queries;
+	char *q = realloc(queries_buffer, queries_pos + 1); /* Shrink the allocation when done reading */
+	queries_buffer = q ? q : queries_buffer;
 	fprintf(stderr, "Read %llu bytes of queries\n", (unsigned long long)queries_pos);
 	
 	char *s;
-	char *end = &queries[queries_pos];
-	for (s = memchr(queries, '\n', end - queries); s; s = memchr(s + 1, '\n', end - (s + 1))) {
+	char *end = &queries_buffer[queries_pos];
+	for (s = memchr(queries_buffer, '\n', end - queries_buffer);
+	     s;
+	     s = memchr(s + 1, '\n', end - (s + 1))) {
 		num_queries++;
 	}
-	if (queries[queries_pos - 1] != '\n') {
+	if (queries_buffer[queries_pos - 1] != '\n') {
 		fprintf(stderr, "Last line did not have a newline, adding additional line.\n");
 		++num_queries;
 	}
@@ -547,7 +550,7 @@ read_queries()
 	}
 
 	size_t n;
-	s = queries;
+	s = queries_buffer;
 	for (n = 0; n < num_queries; n++) {
 		query_list[n] = s;
 		s = memchr(s, '\n', end - s);

@@ -391,13 +391,19 @@ static void
 unregister_wait(int fd)
 {
 	const struct conn_info *conn = &connection_info[fd];
-	if (conn->pending_index != pending_queries - 1) {
-		int ix1 = conn->pending_index;
-		int ix2 = pending_queries - 1;
-		connection_info[ix2].pending_index = ix1;
-		SWAP(pending_list[ix1], pending_list[ix2]);
-	}
+	const unsigned int my_pending_index = conn->pending_index;
+
+	rt_assert(my_pending_index < pending_queries);
+
 	pending_queries--;
+	/* The last slot in pending_list needs to be moved up to our slot if we are 
+	   not the last one. */
+	if (my_pending_index != pending_queries) {
+		struct pollfd *pf = &pending_list[pending_queries];
+		pending_list[my_pending_index] = *pf;
+		struct conn_info *moved_conn = &connection_info[pf->fd];
+		moved_conn->pending_index = my_pending_index;
+	}
 }
 
 static void

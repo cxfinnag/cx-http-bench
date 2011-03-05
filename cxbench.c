@@ -323,12 +323,13 @@ initiate_query(const char *hostname, const struct addrinfo *target, const char *
 		exit(EXIT_FAILURE);
 	}
 
-	connection_info[fd].connect_time = now();
-	connection_info[fd].query = query;
-	connection_info[fd].target = target;
-	connection_info[fd].hostname = hostname;
-	connection_info[fd].pending_index = pending_queries;
-	connection_info[fd].handler = handle_connected;
+	struct conn_info *conn = &connection_info[fd];
+	conn->connect_time = now();
+	conn->query = query;
+	conn->target = target;
+	conn->hostname = hostname;
+	conn->pending_index = pending_queries;
+	conn->handler = handle_connected;
 	dynbuf_init(&connection_info[fd].data);
 
 	int error = connect(fd, target->ai_addr, target->ai_addrlen);

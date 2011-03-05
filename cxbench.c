@@ -312,7 +312,7 @@ static double now()
 }
 
 static size_t num_queries = 0;
-static char *queries_buffer = 0;
+struct dynbuf queries;
 static char **query_list = 0;
 static unsigned int pending_queries = 0;
 
@@ -502,43 +502,33 @@ static void
 read_queries()
 {
 	/* Read all the queries from stdin into an array. */
-	size_t queries_alloc = 0;
-	size_t queries_pos = 0;
 	enum { BYTES_PER_READ = 16384 };
 
 	while (1) {
-		if (BYTES_PER_READ + queries_pos >= queries_alloc) {
-			/* >= to keep room for a potential added trailing 0 */
-			queries_alloc += BYTES_PER_READ + queries_alloc;
-			queries_buffer = realloc(queries_buffer, queries_alloc);
-			if (!queries_buffer) {
-				fprintf(stderr, "Failed to allocate %llu bytes: %s\n",
-					(unsigned long long)queries_alloc, strerror(errno));
-				exit(EXIT_FAILURE);
-			}
-		}
-					 
-		ssize_t l = read(0, queries_buffer + queries_pos, BYTES_PER_READ);
+		dynbuf_set_reserve(&queries, BYTES_PER_READ);
+		ssize_t l = read(0, queries.buffer + queries.pos, BYTES_PER_READ);
 		if (l == -1) {
 			fprintf(stderr, "Read error on stdin: %s\n", strerror(errno));
 			exit(EXIT_FAILURE);
 		}
 		if (l == 0)
 			break;
-		queries_pos += l;
+		queries.pos += l;
 	}
-	char *q = realloc(queries_buffer, queries_pos + 1); /* Shrink the allocation when done reading */
-	queries_buffer = q ? q : queries_buffer;
-	fprintf(stderr, "Read %llu bytes of queries\n", (unsigned long long)queries_pos);
+	dynbuf_set_reserve(&queries, 1);
+	queries.buffer[queries.pos++] = 0;
+	dynbuf_shrink(&queries);
+
+	fprintf(stderr, "Read %llu bytes of queries\n", (unsigned long long)queries.pos);
 	
 	char *s;
-	char *end = &queries_buffer[queries_pos];
-	for (s = memchr(queries_buffer, '\n', end - queries_buffer);
+	char *end = &queries.buffer[queries.pos];
+	for (s = memchr(queries.buffer, '\n', end - queries.buffer);
 	     s;
 	     s = memchr(s + 1, '\n', end - (s + 1))) {
 		num_queries++;
 	}
-	if (queries_buffer[queries_pos - 1] != '\n') {
+	if (queries.buffer[queries.pos - 1] != '\n') {
 		fprintf(stderr, "Last line did not have a newline, adding additional line.\n");
 		++num_queries;
 	}
@@ -550,7 +540,7 @@ read_queries()
 	}
 
 	size_t n;
-	s = queries_buffer;
+	s = queries.buffer;
 	for (n = 0; n < num_queries; n++) {
 		query_list[n] = s;
 		s = memchr(s, '\n', end - s);

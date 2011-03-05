@@ -339,6 +339,7 @@ initiate_query(const char *hostname, const struct addrinfo *target, const char *
 		fprintf(stderr, "initiate_query: socket() fails: %s\n", strerror(errno));
 		exit(EXIT_FAILURE);
 	}
+	rt_assert((unsigned int)fd < num_parallell + MAX_FD_HEADROOM);
 
 	/* Make sure socket is nonblocking, we don't want to wait! */
 	if (fcntl(fd, F_SETFL, fcntl(fd, F_GETFL) | O_NONBLOCK) == -1) {

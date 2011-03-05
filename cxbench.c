@@ -582,7 +582,7 @@ handle_readable(int fd)
 	int len;
 	enum { BYTES_PER_NETWORK_READ = 4000 };
 	do {
-		dynbuf_set_reserve(&conn->data, BYTES_PER_NETWORK_READ);
+		dynbuf_set_reserve(&conn->data, BYTES_PER_NETWORK_READ + 1);
 		len = read(fd, conn->data.buffer + conn->data.pos, BYTES_PER_NETWORK_READ);
 		if (len > 0) {
 			conn->data.pos += len;
@@ -591,6 +591,7 @@ handle_readable(int fd)
 	} while (len > 0);
 	if (len == 0) {
 		conn->finished_result_time = now();
+		conn->data.buffer[conn->data.pos] = 0; /* Zero terminate the result for str fns */
 		fprintf(stderr, "TC=%.1fms T1=%.1fms TF=%.1fms Q=\"%s\"\n",
 		debug("EOF on fd %d. Total length = %d\n", fd, (int)conn->data.pos);
 			1e3 * (conn->connected_time - conn->connect_time),

@@ -26,6 +26,8 @@
 #include <fcntl.h>
 #include <poll.h>
 
+#include "dynbuf.h"
+
 static void usage(const char *name);
 struct addrinfo *lookup_host(const char *address);
 static void print_addresses(const struct addrinfo *ai);
@@ -69,6 +71,8 @@ static struct conn_info {
 	const char *hostname;
 	event_handler handler;
 	unsigned int pending_index;
+
+	struct dynbuf data;
 } *connection_info;
 
 static struct pollfd *pending_list;
@@ -311,6 +315,8 @@ initiate_query(const char *hostname, const struct addrinfo *target, const char *
 	connection_info[fd].hostname = hostname;
 	connection_info[fd].pending_index = pending_queries;
 	connection_info[fd].handler = handle_connected;
+	dynbuf_init(&connection_info[fd].data);
+
 	int error = connect(fd, target->ai_addr, target->ai_addrlen);
 	if (error == -1) {
 		if (errno != EINPROGRESS) {

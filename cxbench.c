@@ -144,8 +144,10 @@ lookup_addrinfo(const struct addrinfo *ai, char *host, size_t hostlen, char *por
 	int error = getnameinfo(ai->ai_addr, ai->ai_addrlen, host, hostlen,
 				port, portlen, NI_NUMERICHOST | NI_NUMERICSERV);
 	if (error) {
-		strlcpy(host, "(invalid)", hostlen);
-		strlcpy(port, "(invalid)", portlen);
+		strncpy(host, "(invalid)", hostlen);
+		host[hostlen - 1] = 0;
+		strncpy(port, "(invalid)", portlen);
+		port[portlen - 1] = 0;
 	}
 
 	return error;
@@ -226,13 +228,15 @@ lookup_host(const char *address)
 		return NULL;
 	}
 
-	size_t name_len = colon - address + 1;
-	char *name = alloca(name_len);
-	strlcpy(name, address, name_len);
+	size_t name_len = colon - address;
+	char *name = alloca(name_len + 1);
+	memcpy(name, address, name_len);
+	name[name_len] = 0;
 
-	size_t port_len = strlen(colon);
-	char *port = alloca(port_len);
-	strlcpy(port, colon + 1, port_len);
+	size_t port_len = strlen(colon + 1);
+	char *port = alloca(port_len + 1);
+	memcpy(port, colon + 1, port_len);
+	port[port_len] = 0;
 	
 	struct addrinfo hints;
 	memset(&hints, 0, sizeof hints);

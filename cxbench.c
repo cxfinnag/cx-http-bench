@@ -54,6 +54,14 @@ typedef int (*event_handler)(int);
 static int handle_connected(int);
 static int handle_readable(int);
 
+static int debugging = 0;
+
+#define debug(format, args...)				\
+do {							\
+	if (debugging) {				\
+		fprintf(stderr, format , ##args);	\
+	}						\
+} while(0)
 
 static int loop_mode = 0;
 static int random_mode = 0;
@@ -161,6 +169,7 @@ static void
 parse_arguments(int argc, char **argv)
 {
 	static struct option opts[] = {
+		{ "debug", no_argument, NULL, 'd' },
 		{ "loop", no_argument, NULL, 'l' },
 		{ "randomize", no_argument, NULL, 'r' },
 		{ "parallell", required_argument, NULL, 'p' },
@@ -169,8 +178,11 @@ parse_arguments(int argc, char **argv)
 	};
 
 	int ch;
-	while ((ch = getopt_long(argc, argv, "lrp:", opts, NULL)) != -1) {
+	while ((ch = getopt_long(argc, argv, "dlrp:", opts, NULL)) != -1) {
 		switch (ch) {
+		case 'd':
+			debugging++;
+			break;
 		case 'l':
 			loop_mode = 1;
 			break;
@@ -323,10 +335,10 @@ initiate_query(const char *hostname, const struct addrinfo *target, const char *
 			fprintf(stderr, "connect fails immediately: %s\n", strerror(errno));
 			exit(EXIT_FAILURE);
 		} else {
-			fprintf(stderr, "[debug] connect on fd %d in progress\n", fd);
+			debug("connect on fd %d in progress\n", fd);
 		}
 	} else {
-		fprintf(stderr, "[debug] connect on fd %d connected immediately!\n", fd);
+		debug("connect on fd %d connected immediately!\n", fd);
 	}
 	wait_for_connected(fd);
 	pending_queries++;
@@ -363,9 +375,9 @@ unregister_wait(int fd)
 static void
 wait_for_action(void)
 {
-	fprintf(stderr, "[debug] polling for %d fds\n", pending_queries);
+	debug("polling for %d fds\n", pending_queries);
 	int num_fds = poll(pending_list, pending_queries, -1);
-	fprintf(stderr, "[debug] %d fds ready for something\n", num_fds);
+	debug("%d fds ready for something\n", num_fds);
 
 	unsigned int n;
 	for (n = 0; num_fds && n < pending_queries; n++) {
@@ -521,7 +533,7 @@ static int
 handle_connected(int fd)
 {
 	struct conn_info *conn = &connection_info[fd];
-	fprintf(stderr, "[debug] fd %d is now connected\n", fd);
+	debug("fd %d is now connected\n", fd);
 	conn->connected_time = now();
 	conn->first_result_time = 0;
 	conn->finished_result_time = 0;
@@ -549,12 +561,12 @@ handle_connected(int fd)
 		return -1;
 	}
 	buffer[len] = 0;
-	fprintf(stderr, "[debug] Wrote to fd %d %d bytes: 'Get %s...'\n", fd, (int)written,
+	debug("Wrote to fd %d %d bytes: 'Get %s...'\n", fd, (int)written,
 		conn->query);
 	
 	conn->handler = handle_readable;
 	pending_list[conn->pending_index].events = POLLIN;
-	fprintf(stderr, "[debug] pending_list[%d].events = POLLIN\n", conn->pending_index);
+	debug("pending_list[%d].events = POLLIN\n", conn->pending_index);
 	return 0;
 }
 
@@ -562,7 +574,7 @@ static int
 handle_readable(int fd)
 {
 	struct conn_info *conn = &connection_info[fd];
-	fprintf(stderr, "[debug] fd %d is now readable\n", fd);
+	debug("fd %d is now readable\n", fd);
 	
 	if (!conn->first_result_time)
 		conn->first_result_time = now();
@@ -574,23 +586,23 @@ handle_readable(int fd)
 		len = read(fd, conn->data.buffer + conn->data.pos, BYTES_PER_NETWORK_READ);
 		if (len > 0) {
 			conn->data.pos += len;
-			fprintf(stderr, "[debug] got %d bytes from fd %d\n", len, fd);
+			debug("got %d bytes from fd %d\n", len, fd);
 		}
 	} while (len > 0);
 	if (len == 0) {
 		conn->finished_result_time = now();
-		fprintf(stderr, "[debug] EOF on fd %d. Total length = %d\n", fd, (int)conn->data.pos);
 		fprintf(stderr, "TC=%.1fms T1=%.1fms TF=%.1fms Q=\"%s\"\n",
+		debug("EOF on fd %d. Total length = %d\n", fd, (int)conn->data.pos);
 			1e3 * (conn->connected_time - conn->connect_time),
 			1e3 * (conn->first_result_time - conn->connect_time),
 			1e3 * (conn->finished_result_time - conn->connect_time),
 			conn->query);
 	} else if (len == -1) {
 		if (errno == EWOULDBLOCK) {
-			fprintf(stderr, "[debug] must wait for more data from fd %d\n", fd);
+			debug("must wait for more data from fd %d\n", fd);
 			return 1; /* must return and wait for more data */
 		}
-		fprintf(stderr, "[debug] Read error on fd %d: %s\n", fd, strerror(errno));
+		debug("Read error on fd %d: %s\n", fd, strerror(errno));
 	}
 	
 	unregister_wait(fd);
@@ -603,6 +615,7 @@ static void
 usage(const char *name)
 {
 	fprintf(stderr, "Usage: %s [OPTIONS] host:port\n\n"
+		" -d --debugging : Enable debug spam\n"
 		" -l --loop-mode : Run the same queries multple times\n"
 		" -r --random-mode: Run the queries in random order\n"
 		" -p --parallell <n>: Run <n> queries in parallell\n"

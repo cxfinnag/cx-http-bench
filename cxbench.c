@@ -463,7 +463,8 @@ read_queries()
 			break;
 		queries_pos += l;
 	}
-	realloc(queries, queries_pos + 1); /* Shrink the allocation when done reading */
+	char *q = realloc(queries, queries_pos + 1); /* Shrink the allocation when done reading */
+	queries = q ? q : queries;
 	fprintf(stderr, "Read %llu bytes of queries\n", (unsigned long long)queries_pos);
 	
 	char *s;

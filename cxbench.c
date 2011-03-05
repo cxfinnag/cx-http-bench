@@ -153,7 +153,7 @@ select_address(const struct addrinfo *ai)
 		char host[NI_MAXHOST];
 		char port[NI_MAXSERV];
 		lookup_addrinfo(ai, host, sizeof host, port, sizeof port);
-		printf("Testing connection to %s:%s...\n", host, port);
+		fprintf(stderr, "Testing connection to %s:%s...\n", host, port);
 	
 		double t1 = now();
 		int connect_status = connect(fd, ai->ai_addr, ai->ai_addrlen);
@@ -253,7 +253,7 @@ print_addresses(const struct addrinfo *ai)
 			fprintf(stderr, "numeric conv: %s\n", gai_strerror(error));
 			continue;
 		}
-		printf("Address: %s port %s\n", host, service);
+		fprintf(stderr, "Address: %s port %s\n", host, service);
 	}
 }
 

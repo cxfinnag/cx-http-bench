@@ -316,9 +316,9 @@ run_benchmark(const char *hostname, const struct addrinfo *target)
 
 	read_queries();
 	while (pending_queries + num_parallell > 0) {
-		if (pending_queries < num_parallell) {
-			/* Using if and not while here so we do not immediately start
-			   a lot of connects */
+		unsigned int n;
+		enum { MAX_CONNS_IN_ONE_SHOT = 3 }; /* Avoid going bananas with connections */
+		for (n = 0; pending_queries < num_parallell && n < MAX_CONNS_IN_ONE_SHOT; n++) {
 			size_t query_index = fn();
 			if (query_index == (size_t)-1) {
 				num_parallell = 0;

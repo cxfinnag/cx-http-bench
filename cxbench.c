@@ -54,6 +54,8 @@ typedef int (*event_handler)(int);
 static int handle_connected(int);
 static int handle_readable(int);
 
+static int parse_http_result_code(const char *buf, size_t len);
+
 static int debugging = 0;
 
 #define debug(format, args...)				\
@@ -592,8 +594,10 @@ handle_readable(int fd)
 	if (len == 0) {
 		conn->finished_result_time = now();
 		conn->data.buffer[conn->data.pos] = 0; /* Zero terminate the result for str fns */
-		fprintf(stderr, "TC=%.1fms T1=%.1fms TF=%.1fms Q=\"%s\"\n",
 		debug("EOF on fd %d. Total length = %d\n", fd, (int)conn->data.pos);
+		int http_result_code = parse_http_result_code(conn->data.buffer, conn->data.pos);
+		fprintf(stderr, "%.6f RES=%d LEN=%d TC=%.1fms T1=%.1fms TF=%.1fms Q=\"%s\"\n",
+			now(), http_result_code, (int)conn->data.pos,
 			1e3 * (conn->connected_time - conn->connect_time),
 			1e3 * (conn->first_result_time - conn->connect_time),
 			1e3 * (conn->finished_result_time - conn->connect_time),
@@ -611,6 +615,38 @@ handle_readable(int fd)
 	return len;
 }
 
+static int
+parse_http_result_code(const char *buf, size_t len)
+{
+	enum { RESULT_CODE_LEN = 3 };
+	const int header_start_len = strlen("HTTP/1.1 ");
+	char *end;
+
+	if (len < header_start_len + RESULT_CODE_LEN)
+		goto bad_header;
+	if (memcmp(buf, "HTTP/1.1 ", header_start_len) != 0
+	    && memcmp(buf, "HTTP/1.0 ", header_start_len) != 0)
+		goto bad_header;
+	
+	unsigned long http_result = strtoul(buf + header_start_len, &end, 10);
+	if (http_result < 100 || http_result > 999
+	    || end != buf + header_start_len + RESULT_CODE_LEN)
+		goto bad_header;
+
+	return http_result;
+
+ bad_header:
+	{
+		int line_len = MIN(100, len); /* Print max 100 bytes of the first line of result */
+		char fmt[50];
+		char *newline = memchr(buf, '\n', line_len);
+		if (newline)
+			line_len = newline - buf;
+		snprintf(fmt, sizeof fmt, "Invalid HTTP response header: '%%.%d%%s'\n", line_len);
+		fprintf(stderr, fmt, buf);
+		return -1;
+	}
+}
 
 static void
 usage(const char *name)

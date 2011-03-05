@@ -518,6 +518,7 @@ read_queries()
 	dynbuf_set_reserve(&queries, 1);
 	queries.buffer[queries.pos++] = 0;
 	dynbuf_shrink(&queries);
+	queries.pos--; /* Do not count terminating NUL */
 
 	fprintf(stderr, "Read %llu bytes of queries\n", (unsigned long long)queries.pos);
 	

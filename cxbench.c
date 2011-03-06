@@ -66,6 +66,7 @@ static int handle_connected(int);
 static int handle_readable(int);
 
 static int parse_http_result_code(const char *buf, size_t len);
+static char *find_char_or_end(const char *buf, char needle, const char *end);
 
 static int debugging = 0;
 
@@ -522,16 +523,13 @@ read_queries()
 
 	fprintf(stderr, "Read %llu bytes of queries\n", (unsigned long long)queries.pos);
 	
-	char *s;
-	char *end = &queries.buffer[queries.pos];
-	for (s = memchr(queries.buffer, '\n', end - queries.buffer);
-	     s;
-	     s = memchr(s + 1, '\n', end - (s + 1))) {
+	char *s = queries.buffer;
+	char *end = &queries.buffer[queries.pos - 1];
+	num_queries = 1;
+	/* Treat last char as newline regardless */
+	while ((s = find_char_or_end(s, '\n', end)) != end) {
 		num_queries++;
-	}
-	if (queries.buffer[queries.pos - 1] != '\n') {
-		fprintf(stderr, "Last line did not have a newline, adding additional line.\n");
-		++num_queries;
+		s++;
 	}
 	fprintf(stderr, " - found %llu queries\n", (unsigned long long)num_queries);
 	query_list = malloc(num_queries * sizeof(query_list[0]));
@@ -544,10 +542,7 @@ read_queries()
 	s = queries.buffer;
 	for (n = 0; n < num_queries; n++) {
 		query_list[n] = s;
-		s = memchr(s, '\n', end - s);
-		if (!s) {
-			s = end;
-		}
+		s = find_char_or_end(s, '\n', &queries.buffer[queries.pos]);
 		*s = 0;
 		s++;
 	}
@@ -685,13 +680,18 @@ parse_http_result_code(const char *buf, size_t len)
 	{
 		int line_len = MIN(100, len); /* Print max 100 bytes of the first line of result */
 		char fmt[50];
-		char *newline = memchr(buf, '\n', line_len);
-		if (newline)
-			line_len = newline - buf;
+		line_len = find_char_or_end(buf, '\n', buf + line_len) - buf;
 		snprintf(fmt, sizeof fmt, "Invalid HTTP response header: '%%.%d%%s'\n", line_len);
 		fprintf(stderr, fmt, buf);
 		return -1;
 	}
+}
+
+static char *
+find_char_or_end(const char *string, char needle, const char *end)
+{
+	char *s = memchr(string, needle, end - string);
+	return s ? s : (char *)end;
 }
 
 static void

@@ -622,7 +622,11 @@ handle_readable(int fd)
 		conn->first_result_time = now();
 	
 	int len;
-	enum { BYTES_PER_NETWORK_READ = 4000 };
+	enum {
+		BYTES_PER_NETWORK_READ = 4032,
+		INITIAL_DYNBUF_RESERVATION = 8128,
+	};
+	dynbuf_set_reserve(&conn->data, INITIAL_DYNBUF_RESERVATION);
 	do {
 		dynbuf_set_reserve(&conn->data, BYTES_PER_NETWORK_READ + 1);
 		len = read(fd, conn->data.buffer + conn->data.pos, BYTES_PER_NETWORK_READ);
@@ -631,6 +635,7 @@ handle_readable(int fd)
 			debug("got %d bytes from fd %d\n", len, fd);
 		}
 	} while (len > 0);
+
 	if (len == 0) {
 		conn->finished_result_time = now();
 		conn->data.buffer[conn->data.pos] = 0; /* Zero terminate the result for str fns */

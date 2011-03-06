@@ -586,6 +586,7 @@ handle_connected(int fd)
 	if (written == -1) {
 		fprintf(stderr, "Write to fd %d fails: %s\n", fd, strerror(errno));
 		conn->status = CONN_UNUSED;
+		dynbuf_free(&conn->data);
 		close(fd);
 		unregister_wait(fd);
 		errno = saved_errno;
@@ -649,6 +650,7 @@ handle_readable(int fd)
 		debug("Read error on fd %d: %s\n", fd, strerror(errno));
 	}
 	
+	dynbuf_free(&conn->data);
 	unregister_wait(fd);
 	close(fd);
 	return len;

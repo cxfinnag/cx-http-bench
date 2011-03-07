@@ -409,8 +409,10 @@ wait_for_action(void)
 	debug("polling for %d fds\n", pending_queries);
 	int num_fds = poll(pending_list, pending_queries, -1);
 	if (num_fds == -1) {
-		if (errno == EINTR)
+		if (errno == EINTR) {
+			fprintf(stderr, "Poll was interrupted by a signal.\n");
 			return;
+		}
 		fprintf(stderr, "Poll error: %s\n", strerror(errno));
 		exit(EXIT_FAILURE);
 	}

@@ -38,6 +38,7 @@
 #include <poll.h>
 
 #include "dynbuf.h"
+#include "debug.h"
 
 static void usage(const char *name);
 struct addrinfo *lookup_host(const char *address);
@@ -67,27 +68,6 @@ static int handle_readable(int);
 
 static int parse_http_result_code(const char *buf, size_t len);
 static char *find_char_or_end(const char *buf, char needle, const char *end);
-
-static int debugging = 0;
-
-#define debug(format, args...)				\
-do {							\
-	if (debugging) {				\
-		fprintf(stderr, format , ##args);	\
-	}						\
-} while(0)
-
-#define rt_assert(x)							\
-do {									\
-	if (!(x)) {							\
-		fprintf(stderr, "%s:%d %s ASSERT FAILURE %s - PAUSING\n", __FILE__, __LINE__, \
-			__PRETTY_FUNCTION__, #x);			\
-		while (1) {						\
-			pause();					\
-			sleep(1);					\
-		}							\
-	}								\
-} while (0);
 
 static int loop_mode = 0;
 static int random_mode = 0;
@@ -216,7 +196,7 @@ parse_arguments(int argc, char **argv)
 	while ((ch = getopt_long(argc, argv, "dlrp:", opts, NULL)) != -1) {
 		switch (ch) {
 		case 'd':
-			debugging++;
+			increase_debugging();
 			break;
 		case 'l':
 			loop_mode = 1;

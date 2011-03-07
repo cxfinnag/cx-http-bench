@@ -17,7 +17,9 @@ PROGS := cxbench
 CC := cc
 CFLAGS := -O2 -Wall -W
 
-cxbench: cxbench.o dynbuf.o
+cxbench: cxbench.o dynbuf.o debug.o
 	${CC} ${LDFLAGS} ${CFLAGS} -o $@ $+
 
+# Manal dependencies for now, this has got to stop soon.
 dynbuf.o cxbench.o: dynbuf.h
+debug.o cxbench.o: debug.h

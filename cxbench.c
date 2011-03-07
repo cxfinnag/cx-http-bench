@@ -629,6 +629,8 @@ handle_readable(int fd)
 		conn->data.buffer[conn->data.pos] = 0; /* Zero terminate the result for str fns */
 		debug("EOF on fd %d. Total length = %d\n", fd, (int)conn->data.pos);
 		int http_result_code = parse_http_result_code(conn->data.buffer, conn->data.pos);
+		/* @@@ Parse the result more here, e.g. check that various regexes match
+		   or similar? */
 		printf("%.6f RES=%d LEN=%d TC=%.1fms T1=%.1fms TF=%.1fms Q=\"%s\"\n",
 		       now(), http_result_code, (int)conn->data.pos,
 		       1e3 * (conn->connected_time - conn->connect_time),

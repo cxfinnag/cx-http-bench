@@ -36,6 +36,7 @@
 #include <math.h>
 #include <fcntl.h>
 #include <poll.h>
+#include <signal.h>
 
 #include "dynbuf.h"
 #include "debug.h"
@@ -68,6 +69,9 @@ static int handle_readable(int);
 
 static int parse_http_result_code(const char *buf, size_t len);
 static char *find_char_or_end(const char *buf, char needle, const char *end);
+
+static void signal_handler(int signal);
+static int sig_permanent(int sig, void (*handler)(int));
 
 static int loop_mode = 0;
 static int random_mode = 0;
@@ -104,7 +108,8 @@ int
 main(int argc, char **argv)
 {
 	parse_arguments(argc, argv);
-	
+	sig_permanent(SIGINT, signal_handler);
+
 	argc -= optind;
 	argv += optind;
 
@@ -403,6 +408,12 @@ wait_for_action(void)
 {
 	debug("polling for %d fds\n", pending_queries);
 	int num_fds = poll(pending_list, pending_queries, -1);
+	if (num_fds == -1) {
+		if (errno == EINTR)
+			return;
+		fprintf(stderr, "Poll error: %s\n", strerror(errno));
+		exit(EXIT_FAILURE);
+	}
 	debug("%d fds ready for something\n", num_fds);
 
 	unsigned int n;
@@ -627,7 +638,11 @@ handle_readable(int fd)
 			debug("must wait for more data from fd %d\n", fd);
 			return 1; /* must return and wait for more data */
 		}
-		debug("Read error on fd %d: %s\n", fd, strerror(errno));
+		if (errno == EINTR) {
+			fprintf(stderr, "Read was interrupted.\n");
+			return 1;
+		}
+		fprintf(stderr, "Read error on fd %d: %s\n", fd, strerror(errno));
 	}
 	
 	dynbuf_free(&conn->data);
@@ -673,6 +688,25 @@ find_char_or_end(const char *string, char needle, const char *end)
 	char *s = memchr(string, needle, end - string);
 	return s ? s : (char *)end;
 }
+
+
+static int
+sig_permanent(int sig, void (*handler)(int))
+{
+	struct sigaction sa;
+	memset(&sa, 0, sizeof sa);
+	sa.sa_flags = 0;
+	sa.sa_handler = handler;
+	return sigaction(sig, &sa, NULL);
+}
+
+static void
+signal_handler(int sig)
+{
+	(void)sig;
+	num_parallell = 0;
+}
+
 
 static void
 usage(const char *name)

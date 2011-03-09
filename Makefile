@@ -20,6 +20,9 @@ CFLAGS := -O2 -Wall -W
 cxbench: cxbench.o dynbuf.o debug.o
 	${CC} ${LDFLAGS} ${CFLAGS} -o $@ $+
 
+clean:
+	git clean -fX
+
 # Manal dependencies for now, this has got to stop soon.
 dynbuf.o cxbench.o: dynbuf.h
 debug.o cxbench.o: debug.h

@@ -141,9 +141,8 @@ select_address(const struct addrinfo *ai)
 	for (; ai; ai = ai->ai_next) {
 		int fd = socket(ai->ai_family, SOCK_STREAM, ai->ai_protocol);
 		if (fd == -1) {
-			fprintf(stderr, "test_connection: socket(%d, %d, %d): %s\n",
-				ai->ai_family, ai->ai_protocol, SOCK_STREAM,
-				strerror(errno));
+			fprintf(stderr, "test_connection: socket(%d, %d, %d): %s\n", ai->ai_family,
+				ai->ai_protocol, SOCK_STREAM, strerror(errno));
 			continue;
 		}
 
@@ -212,8 +211,7 @@ parse_arguments(int argc, char **argv)
 		case 'p':
 			num_parallell = atoi(optarg);
 			if (num_parallell <= 0) {
-				fprintf(stderr, "Cannot run less than 1 query "
-					"in parallell!\n");
+				fprintf(stderr, "Cannot run less than 1 query in parallell!\n");
 				exit(EXIT_FAILURE);
 			}
 			break;
@@ -244,8 +242,7 @@ print_addresses(const struct addrinfo *ai)
 	char service[NI_MAXSERV];
 
 	for (; ai; ai = ai->ai_next) {
-		int error = lookup_addrinfo(ai, host, sizeof host, service,
-					    sizeof service);
+		int error = lookup_addrinfo(ai, host, sizeof host, service, sizeof service);
 		if (error) {
 			fprintf(stderr, "numeric conv: %s\n", gai_strerror(error));
 			continue;
@@ -549,9 +546,8 @@ size_t
 generate_query(char *buf, size_t buf_len, const char *host, const char *query)
 {
 	size_t would_write = snprintf(buf, buf_len,
-				      "GET %s%s HTTP/1.1\r\n"
-				      "Host: %s\r\n"
-				      "Connection: close\r\n\r\n", query_prefix, query, host);
+				      "GET %s%s HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n\r\n",
+				      query_prefix, query, host);
 	return MIN(buf_len - 1, would_write);
 }
 
@@ -583,8 +579,8 @@ handle_connected(int fd)
 	if ((size_t)written != len) {
 		/* @@@ TODO eventually we should handle this to support queries that are longer
 		   than the socket buffer */
-		fprintf(stderr, "Short write to fd %d: %llu/%llu, aborting query\n",
-			fd, (unsigned long long)written, (unsigned long long)len);
+		fprintf(stderr, "Short write to fd %d: %llu/%llu, aborting query\n", fd,
+			(unsigned long long)written, (unsigned long long)len);
 		close(fd);
 		unregister_wait(fd);
 		errno = EWOULDBLOCK;

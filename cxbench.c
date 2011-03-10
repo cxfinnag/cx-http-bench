@@ -442,7 +442,7 @@ select_query_function(void)
 
 
 static void
-randomize_query_list()
+randomize_query_list(void)
 {
 	size_t n;
 	for (n = 0; n < num_queries - 1; n++) {
@@ -452,14 +452,14 @@ randomize_query_list()
 }
 
 static const char *
-next_random_query()
+next_random_query(void)
 {
 	unsigned int idx = drand48() * num_queries;
 	return query_list[idx];
 }
 
 static const char *
-next_loop_query()
+next_loop_query(void)
 {
 	static size_t idx;
 	if (idx >= num_queries)
@@ -468,7 +468,7 @@ next_loop_query()
 }
 
 static const char *
-next_query_noloop()
+next_query_noloop(void)
 {
 	static size_t idx;
 	if (idx >= num_queries)
@@ -477,10 +477,10 @@ next_query_noloop()
 }
 
 static double
-poisson_wait()
+poisson_wait(void)
 {
 	/* Return the number of time units to wait for the next event in a Poisson process
-	   with expected value 1 */
+	   where the average waiting time is 1 */
 	double r = drand48();
 	if (r < 1e-15) {
 		/* Values should be 0, 35527e-15 * N, N = 1, 2, ... 2 ^ 48 */
@@ -490,7 +490,7 @@ poisson_wait()
 }
 
 static void
-read_queries()
+read_queries(void)
 {
 	/* Read all the queries from stdin into an array. */
 	enum { BYTES_PER_READ = 16384 };

@@ -119,7 +119,7 @@ main(int argc, char **argv)
 		exit(EXIT_FAILURE);
 	}
 	print_addresses(res);
-	
+
 	const struct addrinfo *target = select_address(res);
 	if (!target) {
 		fprintf(stderr, "Cannot connect to benchmark server, aborting.\n");
@@ -127,9 +127,7 @@ main(int argc, char **argv)
 	}
 
 	run_benchmark(argv[0], target);
-	
 	freeaddrinfo(res);
-	
 	exit(EXIT_SUCCESS);
 }
 
@@ -150,7 +148,7 @@ select_address(const struct addrinfo *ai)
 		char port[NI_MAXSERV];
 		lookup_addrinfo(ai, host, sizeof host, port, sizeof port);
 		fprintf(stderr, "Testing connection to %s:%s...\n", host, port);
-	
+
 		double t1 = now();
 		int connect_status = connect(fd, ai->ai_addr, ai->ai_addrlen);
 		int saved_errno = errno;
@@ -161,7 +159,7 @@ select_address(const struct addrinfo *ai)
 			fprintf(stderr, "Connection OK in %.3fms.\n", 1e3 * (t2 - t1));
 			return ai;
 		}
-			
+
 		fprintf(stderr, "Failed to connect: %s\n", strerror(saved_errno));
 	}
 	return NULL;
@@ -270,7 +268,7 @@ lookup_host(const char *address)
 	char *port = alloca(port_len + 1);
 	memcpy(port, colon + 1, port_len);
 	port[port_len] = 0;
-	
+
 	struct addrinfo hints;
 	memset(&hints, 0, sizeof hints);
 	hints.ai_family = PF_UNSPEC;
@@ -439,8 +437,6 @@ select_query_function(void)
 	return next_query_noloop;
 }
 
-
-
 static void
 randomize_query_list(void)
 {
@@ -512,7 +508,7 @@ read_queries(void)
 	queries.pos--; /* Do not count terminating NUL */
 
 	fprintf(stderr, "Read %llu bytes of queries\n", (unsigned long long)queries.pos);
-	
+
 	char *s = queries.buffer;
 	char *end = &queries.buffer[queries.pos - 1];
 	num_queries = 1;
@@ -561,7 +557,7 @@ handle_connected(int fd)
 	conn->connected_time = now();
 	conn->first_result_time = 0;
 	conn->finished_result_time = 0;
-	
+
 	char buffer[20000];
 	size_t len = generate_query(buffer, sizeof buffer, conn->hostname, conn->query);
 
@@ -589,7 +585,7 @@ handle_connected(int fd)
 	buffer[len] = 0;
 	debug("Wrote to fd %d %d bytes: 'Get %s...'\n", fd, (int)written,
 		conn->query);
-	
+
 	conn->handler = handle_readable;
 	pending_list[conn->pending_index].events = POLLIN;
 	debug("pending_list[%d].events = POLLIN\n", conn->pending_index);
@@ -601,10 +597,10 @@ handle_readable(int fd)
 {
 	struct conn_info *conn = &connection_info[fd];
 	debug("fd %d is now readable\n", fd);
-	
+
 	if (!conn->first_result_time)
 		conn->first_result_time = now();
-	
+
 	int len;
 	enum {
 		BYTES_PER_NETWORK_READ = 4032,
@@ -644,7 +640,7 @@ handle_readable(int fd)
 		}
 		fprintf(stderr, "Read error on fd %d: %s\n", fd, strerror(errno));
 	}
-	
+
 	dynbuf_free(&conn->data);
 	unregister_wait(fd);
 	close(fd);
@@ -663,7 +659,7 @@ parse_http_result_code(const char *buf, size_t len)
 	if (memcmp(buf, "HTTP/1.1 ", header_start_len) != 0
 	    && memcmp(buf, "HTTP/1.0 ", header_start_len) != 0)
 		goto bad_header;
-	
+
 	unsigned long http_result = strtoul(buf + header_start_len, &end, 10);
 	if (http_result < 100 || http_result > 999
 	    || end != buf + header_start_len + RESULT_CODE_LEN)

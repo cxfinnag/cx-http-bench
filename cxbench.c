@@ -275,6 +275,7 @@ run_benchmark(const char *hostname, const struct addrinfo *target)
 {
 	query_function fn = select_query_function();
 	connection_info = calloc(num_parallell + MAX_FD_HEADROOM, sizeof connection_info[0]);
+	init_wait(num_parallell);
 
 	read_queries();
 	while (wait_num_pending() + num_parallell > 0) {
@@ -285,11 +286,13 @@ run_benchmark(const char *hostname, const struct addrinfo *target)
 			if (!query) {
 				num_parallell = 0;
 				fprintf(stderr, "Finished sending queries\n");
-				break;
+				goto next;
 			}
 			initiate_query(hostname, target, query);
 		}
  		wait_for_action();
+	next:
+		{}
 	}
 }
 

@@ -58,8 +58,8 @@ wait_for_action(void)
 	
 	int n;
 	for (n = 0; n < num_fds; n++) {
-		int fd = events[n].data.fd;
-		connection_info[fd].handler(fd);
+		struct conn_info *conn = events[n].data.ptr;
+		conn->handler(conn);
 	}
 }
 
@@ -70,7 +70,7 @@ wait_for_connected(struct conn_info *conn)
 	struct epoll_event ev;
 
 	ev.events = EPOLLOUT;
-	ev.data.fd = conn->fd;
+	ev.data.ptr = conn;
 
 	int err = epoll_ctl(epoll_fd, EPOLL_CTL_ADD, conn->fd, &ev);
 	if (err == -1) {
@@ -101,7 +101,7 @@ wait_for_read(struct conn_info *conn)
 
 	struct epoll_event ev;
 	ev.events = EPOLLIN;
-	ev.data.fd = fd;
+	ev.data.ptr = conn;
 
 	int err = epoll_ctl(epoll_fd, EPOLL_CTL_MOD, fd, &ev);
 	if (err == -1) {

@@ -18,7 +18,12 @@ CC := cc
 CFLAGS := -O2 -Wall -W
 
 # Select the best poller depending on the OS
+OS := $(shell uname -s)
+ifeq ($(OS),Linux)
+POLLER := wait-epoll.o
+else
 POLLER := wait-poll.o
+endif
 
 cxbench: cxbench.o dynbuf.o debug.o ${POLLER} connection-info.o
 	${CC} ${LDFLAGS} ${CFLAGS} -o $@ $+

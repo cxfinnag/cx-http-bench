@@ -1,5 +1,5 @@
-#ifndef CONNECTION_INFO_H
-#define CONNECTION_INFO_H
+#ifndef WAIT_EPOLL_H
+#define WAIT_EPOLL_H
 
 /*
  * Copyright (c) 2011, Finn Arne Gangstad <finnag@cxense.com>
@@ -18,39 +18,21 @@
  *
  */
 
-#include "dynbuf.h"
-
-typedef int (*event_handler)(int);
-
-enum conn_info_status {
-	CONN_UNUSED = 0, /* Should be 0 for easy memset cleaning of all statuses */
-	CONN_CONNECTING,
-	CONN_CONNECTED,
-	CONN_WAITING_RESULT,
-	CONN_MORE_RESULTS
-};
-
-struct conn_info {
-	double connect_time;
-	double connected_time;
-	double first_result_time;
-	double finished_result_time;
-
-	const char *query;
-	const struct addrinfo *target;
-	const char *hostname;
-	event_handler handler;
-	unsigned int pending_index;
-	enum conn_info_status status;
-	int fd;
-
-	struct dynbuf data;
-};
-
-extern struct conn_info *connection_info;
+/*
+ * This is used on Linux primarily for fast poll action.
+ */
 
 
-#endif /* !CONNECTION_INFO_H */
+struct conn_info;
+
+void init_wait(int max_pending);
+void wait_for_action(void);
+void unregister_wait(int fd);
+unsigned int wait_num_pending(void);
+void wait_for_connected(struct conn_info *conn);
+void wait_for_read(struct conn_info *conn);
+
+#endif /* !WAIT_EPOLL_H  */
 
 /* Local Variables: */
 /* c-basic-offset:8 */

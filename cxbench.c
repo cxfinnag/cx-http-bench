@@ -311,13 +311,14 @@ initiate_query(const char *hostname, const struct addrinfo *target, const char *
 
 	struct conn_info *conn = &connection_info[fd];
 	conn->connect_time = now();
+	conn->fd = fd;
 	conn->status = CONN_CONNECTING;
 	conn->query = query;
 	conn->target = target;
 	conn->hostname = hostname;
 	conn->pending_index = wait_num_pending();
 	conn->handler = handle_connected;
-	dynbuf_init(&connection_info[fd].data);
+	dynbuf_init(&conn->data);
 
 	int error = connect(fd, target->ai_addr, target->ai_addrlen);
 	if (error == -1) {
@@ -330,7 +331,7 @@ initiate_query(const char *hostname, const struct addrinfo *target, const char *
 	} else {
 		debug("connect on fd %d connected immediately!\n", fd);
 	}
-	wait_for_connected(fd);
+	wait_for_connected(conn);
 }
 
 

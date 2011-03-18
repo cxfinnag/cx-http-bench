@@ -57,14 +57,6 @@ dynbuf_set_reserve(struct dynbuf *d, size_t n)
 }
 
 void
-dynbuf_store(struct dynbuf *d, const char *buf, size_t n)
-{
-	dynbuf_set_reserve(d, n);
-	memcpy(d->buffer, buf, n);
-	d->pos += n;
-}
-
-void
 dynbuf_shrink(struct dynbuf *d)
 {
 	char *s = realloc(d->buffer, d->pos);

@@ -20,13 +20,14 @@ CFLAGS := -O2 -Wall -W
 # Select the best poller depending on the OS
 POLLER := wait-poll.o
 
-cxbench: cxbench.o dynbuf.o debug.o ${POLLER}
+cxbench: cxbench.o dynbuf.o debug.o ${POLLER} connection-info.o
 	${CC} ${LDFLAGS} ${CFLAGS} -o $@ $+
 
 clean:
 	git clean -fX
 
 # Manal dependencies for now, this has got to stop soon.
-dynbuf.o cxbench.o: dynbuf.h
-debug.o cxbench.o: debug.h
+dynbuf.o cxbench.o connection-info.h: dynbuf.h
+debug.o cxbench.o wait-poll.o: debug.h
+cxbench.o ${POLLER}: connection-info.h
 ${POLLER}: ${POLLER:.o=.h}

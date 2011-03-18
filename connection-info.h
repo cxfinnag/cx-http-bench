@@ -1,3 +1,6 @@
+#ifndef CONNECTION_INFO_H
+#define CONNECTION_INFO_H
+
 /*
  * Copyright (c) 2011, Finn Arne Gangstad <finnag@cxense.com>
  *
@@ -15,39 +18,40 @@
  *
  */
 
-#ifndef DEBUG_H
-#define DEBUG_H
+#include "dynbuf.h"
 
-#include <stdio.h>
-#include <unistd.h>
+typedef int (*event_handler)(int);
 
-extern int is_debugging;
+enum conn_info_status {
+	CONN_UNUSED = 0, /* Should be 0 for easy memset cleaning of all statuses */
+	CONN_CONNECTING,
+	CONN_CONNECTED,
+	CONN_WAITING_RESULT,
+	CONN_MORE_RESULTS
+};
 
-void increase_debugging();
+struct conn_info {
+	double connect_time;
+	double connected_time;
+	double first_result_time;
+	double finished_result_time;
 
-#define debug(format, args...)				\
-do {							\
-	if (is_debugging) {				\
-		fprintf(stderr, format , ##args);	\
-	}						\
-} while(0)
+	const char *query;
+	const struct addrinfo *target;
+	const char *hostname;
+	event_handler handler;
+	unsigned int pending_index;
+	enum conn_info_status status;
 
-#define rt_assert(x)							\
-do {									\
-	if (!(x)) {							\
-		fprintf(stderr, "%s:%d %s ASSERT FAILURE %s - PAUSING\n", __FILE__, __LINE__, \
-			__PRETTY_FUNCTION__, #x);			\
-		while (1) {						\
-			pause();					\
-			sleep(1);					\
-		}							\
-	}								\
-} while (0);
+	struct dynbuf data;
+};
 
-#endif /* !DEBUG_H */
+extern struct conn_info *connection_info;
+
+
+#endif /* !CONNECTION_INFO_H */
 
 /* Local Variables: */
 /* c-basic-offset:8 */
 /* indent-tabs-mode:t */
 /* End:  */
-

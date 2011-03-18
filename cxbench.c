@@ -35,11 +35,12 @@
 #include <sys/time.h>
 #include <math.h>
 #include <fcntl.h>
-#include <poll.h>
 #include <signal.h>
 
 #include "dynbuf.h"
 #include "debug.h"
+#include "wait-poll.h" /* @@@ fix this to wait for the right thing */
+#include "connection-info.h"
 
 static void usage(const char *name);
 struct addrinfo *lookup_host(const char *address);
@@ -51,9 +52,6 @@ static void run_benchmark(const char *hostname, const struct addrinfo *addr);
 static void read_queries(void);
 static void randomize_query_list();
 static void initiate_query(const char *hostname, const struct addrinfo *target, const char *query);
-static void wait_for_action(void);
-static void wait_for_connected(int fd);
-static void unregister_wait(int fd);
 
 static double now(void);
 
@@ -63,7 +61,6 @@ static const char *next_random_query(void);
 static const char *next_loop_query(void);
 static const char *next_query_noloop(void);
 
-typedef int (*event_handler)(int);
 static int handle_connected(int);
 static int handle_readable(int);
 
@@ -78,31 +75,6 @@ static int random_mode = 0;
 static unsigned int num_parallell = 1;
 static const char *query_prefix = "";
 
-enum conn_info_status {
-	CONN_UNUSED = 0, /* Should be 0 for easy memset cleaning of all statuses */
-	CONN_CONNECTING,
-	CONN_CONNECTED,
-	CONN_WAITING_RESULT,
-	CONN_MORE_RESULTS
-};
-
-static struct conn_info {
-	double connect_time;
-	double connected_time;
-	double first_result_time;
-	double finished_result_time;
-
-	const char *query;
-	const struct addrinfo *target;
-	const char *hostname;
-	event_handler handler;
-	unsigned int pending_index;
-	enum conn_info_status status;
-
-	struct dynbuf data;
-} *connection_info;
-
-static struct pollfd *pending_list;
 
 int
 main(int argc, char **argv)
@@ -295,7 +267,6 @@ static double now()
 static size_t num_queries = 0;
 struct dynbuf queries;
 static char **query_list = 0;
-static unsigned int pending_queries = 0;
 
 enum { MAX_FD_HEADROOM = 20 };
 
@@ -304,13 +275,12 @@ run_benchmark(const char *hostname, const struct addrinfo *target)
 {
 	query_function fn = select_query_function();
 	connection_info = calloc(num_parallell + MAX_FD_HEADROOM, sizeof connection_info[0]);
-	pending_list = calloc(num_parallell, sizeof(pending_list[0]));
 
 	read_queries();
-	while (pending_queries + num_parallell > 0) {
+	while (wait_num_pending() + num_parallell > 0) {
 		unsigned int n;
 		enum { MAX_CONNS_IN_ONE_SHOT = 3 }; /* Avoid going bananas with connections */
-		for (n = 0; pending_queries < num_parallell && n < MAX_CONNS_IN_ONE_SHOT; n++) {
+		for (n = 0; wait_num_pending() < num_parallell && n < MAX_CONNS_IN_ONE_SHOT; n++) {
 			const char *query = fn();
 			if (!query) {
 				num_parallell = 0;
@@ -345,7 +315,7 @@ initiate_query(const char *hostname, const struct addrinfo *target, const char *
 	conn->query = query;
 	conn->target = target;
 	conn->hostname = hostname;
-	conn->pending_index = pending_queries;
+	conn->pending_index = wait_num_pending();
 	conn->handler = handle_connected;
 	dynbuf_init(&connection_info[fd].data);
 
@@ -361,16 +331,8 @@ initiate_query(const char *hostname, const struct addrinfo *target, const char *
 		debug("connect on fd %d connected immediately!\n", fd);
 	}
 	wait_for_connected(fd);
-	pending_queries++;
 }
 
-static void
-wait_for_connected(int fd)
-{
-	memset(&pending_list[pending_queries], 0, sizeof pending_list[pending_queries]);
-	pending_list[pending_queries].fd = fd;
-	pending_list[pending_queries].events = POLLOUT;
-}
 
 #define SWAP(a, b)				\
 do {						\
@@ -378,51 +340,6 @@ do {						\
 	(a) = (b);				\
 	(b) = tmp;				\
 } while (0)
-
-static void
-unregister_wait(int fd)
-{
-	const struct conn_info *conn = &connection_info[fd];
-	const unsigned int my_pending_index = conn->pending_index;
-
-	rt_assert(my_pending_index < pending_queries);
-
-	pending_queries--;
-	/* The last slot in pending_list needs to be moved up to our slot if we are 
-	   not the last one. */
-	if (my_pending_index != pending_queries) {
-		struct pollfd *pf = &pending_list[pending_queries];
-		pending_list[my_pending_index] = *pf;
-		struct conn_info *moved_conn = &connection_info[pf->fd];
-		moved_conn->pending_index = my_pending_index;
-	}
-}
-
-static void
-wait_for_action(void)
-{
-	debug("polling for %d fds\n", pending_queries);
-	int num_fds = poll(pending_list, pending_queries, -1);
-	if (num_fds == -1) {
-		if (errno == EINTR) {
-			fprintf(stderr, "Poll was interrupted by a signal.\n");
-			return;
-		}
-		fprintf(stderr, "Poll error: %s\n", strerror(errno));
-		exit(EXIT_FAILURE);
-	}
-	debug("%d fds ready for something\n", num_fds);
-
-	unsigned int n;
-	for (n = 0; num_fds && n < pending_queries; n++) {
-		struct pollfd *p = &pending_list[n];
-		if (p->revents) {
-			int fd = p->fd;
-			connection_info[fd].handler(fd);
-			num_fds--;
-		}
-	}
-}
 
 query_function
 select_query_function(void)
@@ -582,7 +499,7 @@ handle_connected(int fd)
 		conn->query);
 
 	conn->handler = handle_readable;
-	pending_list[conn->pending_index].events = POLLIN;
+	wait_for_read(conn);
 	debug("pending_list[%d].events = POLLIN\n", conn->pending_index);
 	return 0;
 }

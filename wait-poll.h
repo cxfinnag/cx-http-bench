@@ -24,4 +24,19 @@
  */
 
 
+
+struct conn_info;
+
+void init_wait(int max_pending);
+void wait_for_action(void);
+void wait_for_connected(int fd);
+void unregister_wait(int fd);
+unsigned int wait_num_pending(void);
+void wait_for_read(struct conn_info *conn);
+
 #endif /* !WAIT_POLL_H  */
+
+/* Local Variables: */
+/* c-basic-offset:8 */
+/* indent-tabs-mode:t */
+/* End:  */

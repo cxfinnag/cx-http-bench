@@ -93,14 +93,12 @@ unregister_wait(int fd)
 void
 wait_for_read(struct conn_info *conn)
 {
-	int fd = conn->fd;
-
 	struct kevent kev;
-	EV_SET(&kev, fd, EVFILT_READ, EV_ADD,  0, 0, conn);
+	EV_SET(&kev, conn->fd, EVFILT_READ, EV_ADD,  0, 0, conn);
 	int err = kevent(kqueue_fd, &kev, 1, NULL, 0, NULL);
 	if (err == -1) {
 		fprintf(stderr, "wait_for_read: kevent(%d, %d, EVFILT_READ, EV_ADD): %s\n",
-			kqueue_fd, fd, strerror(errno));
+			kqueue_fd, conn->fd, strerror(errno));
 		exit(EXIT_FAILURE);
 	}
 }

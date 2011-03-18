@@ -74,7 +74,8 @@ wait_for_connected(struct conn_info *conn)
 
 	int err = epoll_ctl(epoll_fd, EPOLL_CTL_ADD, conn->fd, &ev);
 	if (err == -1) {
-		fprintf(stderr, "epoll_ctl failure in wait_for_connected: %s\n", strerror(errno));
+		fprintf(stderr, "wait_for_connected: epoll_ctl(%d, ADD, %d, ..): %s\n",
+			epoll_fd, conn->fd, strerror(errno));
 		exit(EXIT_FAILURE);
 	}
 	pending_queries++;

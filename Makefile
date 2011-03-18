@@ -17,7 +17,10 @@ PROGS := cxbench
 CC := cc
 CFLAGS := -O2 -Wall -W
 
-cxbench: cxbench.o dynbuf.o debug.o
+# Select the best poller depending on the OS
+POLLER := wait-poll.o
+
+cxbench: cxbench.o dynbuf.o debug.o ${POLLER}
 	${CC} ${LDFLAGS} ${CFLAGS} -o $@ $+
 
 clean:
@@ -26,3 +29,4 @@ clean:
 # Manal dependencies for now, this has got to stop soon.
 dynbuf.o cxbench.o: dynbuf.h
 debug.o cxbench.o: debug.h
+${POLLER}: ${POLLER:.o=.h}

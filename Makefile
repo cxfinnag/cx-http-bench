@@ -25,14 +25,26 @@ else
 POLLER := wait-poll.o
 endif
 
-cxbench: cxbench.o dynbuf.o debug.o ${POLLER} connection-info.o
+OBJ := cxbench.o dynbuf.o debug.o ${POLLER} connection-info.o
+
+cxbench: ${OBJ}
 	${CC} ${LDFLAGS} ${CFLAGS} -o $@ $+
+
+fmakedep: fmakedep.c
+	$(CC) $(CFLAGS) -s -static -o $@ $<
+
+%.d: %.c fmakedep
+	@echo fmakedep $<
+	@./fmakedep --disable-caching --no-sys-includes --dep-header="$@ $*.o $*.oo:" \
+		$(CFLAGS) $< > $@
+
+%.d: %.cpp fmakedep
+	@echo fmakedep $<
+	@./fmakedep --disable-caching --no-sys-includes --dep-header="$@ $*.o:" \
+		$(CFLAGS) $< > $@
+
 
 clean:
 	git clean -fX
 
-# Manal dependencies for now, this has got to stop soon.
-dynbuf.o cxbench.o connection-info.h: dynbuf.h
-debug.o cxbench.o wait-poll.o: debug.h
-cxbench.o ${POLLER}: connection-info.h
-${POLLER}: ${POLLER:.o=.h}
+-include $(OBJ:%.o=%.d)

@@ -1,3 +1,5 @@
 *~
 *.o
 cxbench
+*.d
+/fmakedep

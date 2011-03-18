@@ -61,8 +61,8 @@ static const char *next_random_query(void);
 static const char *next_loop_query(void);
 static const char *next_query_noloop(void);
 
-static int handle_connected(int);
-static int handle_readable(int);
+static int handle_connected(struct conn_info *);
+static int handle_readable(struct conn_info *);
 
 static int parse_http_result_code(const char *buf, size_t len);
 static char *find_char_or_end(const char *buf, char needle, const char *end);
@@ -465,9 +465,9 @@ generate_query(char *buf, size_t buf_len, const char *host, const char *query)
 
 
 static int
-handle_connected(int fd)
+handle_connected(struct conn_info *conn)
 {
-	struct conn_info *conn = &connection_info[fd];
+	int fd = conn->fd;
 	debug("fd %d is now connected\n", fd);
 	conn->status = CONN_CONNECTED;
 	conn->connected_time = now();
@@ -483,8 +483,8 @@ handle_connected(int fd)
 		fprintf(stderr, "Write to fd %d fails: %s\n", fd, strerror(errno));
 		conn->status = CONN_UNUSED;
 		dynbuf_free(&conn->data);
-		close(fd);
 		unregister_wait(fd);
+		close(fd);
 		errno = saved_errno;
 		return -1;
 	}
@@ -493,8 +493,8 @@ handle_connected(int fd)
 		   than the socket buffer */
 		fprintf(stderr, "Short write to fd %d: %llu/%llu, aborting query\n", fd,
 			(unsigned long long)written, (unsigned long long)len);
-		close(fd);
 		unregister_wait(fd);
+		close(fd);
 		errno = EWOULDBLOCK;
 		return -1;
 	}
@@ -509,9 +509,9 @@ handle_connected(int fd)
 }
 
 static int
-handle_readable(int fd)
+handle_readable(struct conn_info *conn)
 {
-	struct conn_info *conn = &connection_info[fd];
+	int fd = conn->fd;
 	debug("fd %d is now readable\n", fd);
 
 	if (!conn->first_result_time)

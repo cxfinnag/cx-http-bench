@@ -21,6 +21,8 @@ CFLAGS := -O2 -Wall -W
 OS := $(shell uname -s)
 ifeq ($(OS),Linux)
 POLL_METHOD := epoll
+else ifeq ($(OS),Darwin)
+POLL_METHOD := kqueue
 else
 POLL_METHOD := poll
 endif

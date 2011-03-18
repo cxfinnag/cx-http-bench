@@ -1,7 +1,8 @@
-*~
-*.o
-cxbench
 *.d
-/fmakedep
-\#*
+*.o
+*~
 .#*
+/fmakedep
+/fmakedep.dSYM
+\#*
+cxbench

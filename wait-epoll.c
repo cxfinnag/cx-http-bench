@@ -86,6 +86,7 @@ unregister_wait(int fd)
 {
 	/* unregister_wait() is always followed by a close(), so we do not have to remove the fd
 	   from the epoll set, the OS does so automatically for us */
+	(void)fd;
 	pending_queries--;
 }
 

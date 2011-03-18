@@ -84,8 +84,8 @@ wait_for_connected(struct conn_info *conn)
 void
 unregister_wait(int fd)
 {
-	/* We do not have to do any kqueue magic, unregister is always followed
-	   by a close() which will automagically remove the fd from the kqueue */
+	/* We do not have to do any kqueue magic, unregister_wait() is always followed
+	   by a close() which will automagically removes the fd from the kqueue */
 	(void)fd;
 	pending_queries--;
 }

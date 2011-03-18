@@ -27,8 +27,6 @@ endif
 
 POLLER := wait-${POLL_METHOD}.o
 
-CFLAGS := ${CFLAGS} -DPOLL=${POLL_METHOD}
-
 OBJ := cxbench.o dynbuf.o debug.o ${POLLER} connection-info.o
 
 cxbench: ${OBJ}

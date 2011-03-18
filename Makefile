@@ -33,7 +33,8 @@ cxbench: ${OBJ}
 	${CC} ${LDFLAGS} ${CFLAGS} -o $@ $+
 
 fmakedep: fmakedep.c
-	$(CC) $(CFLAGS) -s -static -o $@ $<
+	$(CC) $(CFLAGS) -o $@ $<
+	strip $@
 
 %.d: %.c fmakedep
 	@echo fmakedep $<

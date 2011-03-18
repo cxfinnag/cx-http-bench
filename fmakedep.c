@@ -273,7 +273,7 @@ find_deps(const char *filename)
     }
 
     /* Ignore files that are too short to have an include stmt */
-    if (st.st_size < strlen("#include <>"))
+    if (st.st_size < (off_t)strlen("#include <>"))
 	goto out_premalloc;
 
     buf = malloc(st.st_size + 1);

@@ -20,10 +20,14 @@ CFLAGS := -O2 -Wall -W
 # Select the best poller depending on the OS
 OS := $(shell uname -s)
 ifeq ($(OS),Linux)
-POLLER := wait-epoll.o
+POLL_METHOD := epoll
 else
-POLLER := wait-poll.o
+POLL_METHOD := poll
 endif
+
+POLLER := wait-${POLL_METHOD}.o
+
+CFLAGS := ${CFLAGS} -DPOLL=${POLL_METHOD}
 
 OBJ := cxbench.o dynbuf.o debug.o ${POLLER} connection-info.o
 
@@ -35,14 +39,13 @@ fmakedep: fmakedep.c
 
 %.d: %.c fmakedep
 	@echo fmakedep $<
-	@./fmakedep --disable-caching --no-sys-includes --dep-header="$@ $*.o $*.oo:" \
-		$(CFLAGS) $< > $@
+	@./fmakedep --disable-caching --no-sys-includes \
+		--dep-header="$@ $*.o:" $(CFLAGS) $< > $@
 
 %.d: %.cpp fmakedep
 	@echo fmakedep $<
-	@./fmakedep --disable-caching --no-sys-includes --dep-header="$@ $*.o:" \
-		$(CFLAGS) $< > $@
-
+	@./fmakedep --disable-caching --no-sys-includes \
+		--dep-header="$@ $*.o:" $(CFLAGS) $< > $@
 
 clean:
 	git clean -fX

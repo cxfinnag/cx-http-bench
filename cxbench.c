@@ -39,7 +39,7 @@
 
 #include "dynbuf.h"
 #include "debug.h"
-#include "wait-poll.h" /* @@@ fix this to wait for the right thing */
+#include "wait-interface.h"
 #include "connection-info.h"
 
 static void usage(const char *name);

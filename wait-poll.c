@@ -22,7 +22,7 @@
 #include <string.h>
 
 #include "debug.h"
-#include "wait-poll.h"
+#include "wait-interface.h"
 #include "connection-info.h"
 
 static struct pollfd *pending_list;

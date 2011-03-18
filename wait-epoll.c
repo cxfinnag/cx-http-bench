@@ -22,7 +22,7 @@
 #include <string.h>
 
 #include "debug.h"
-#include "wait-epoll.h"
+#include "wait-interface.h"
 #include "connection-info.h"
 
 static unsigned int pending_queries = 0;

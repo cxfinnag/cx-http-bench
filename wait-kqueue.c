@@ -74,7 +74,7 @@ wait_for_connected(struct conn_info *conn)
 	EV_SET(&kev, fd, EVFILT_WRITE, EV_ADD | EV_ONESHOT,  0, 0, conn);
 	int err = kevent(kqueue_fd, &kev, 1, NULL, 0, NULL);
 	if (err == -1) {
-		fprintf(stderr, "wait_for_connected: kevent(%d, ADD, %d, ..): %s\n",
+		fprintf(stderr, "wait_for_connected: kevent(%d, %d, EVFILT_WRITE, EV_ADD): %s\n",
 			kqueue_fd, fd, strerror(errno));
 		exit(EXIT_FAILURE);
 	}
@@ -99,8 +99,8 @@ wait_for_read(struct conn_info *conn)
 	EV_SET(&kev, fd, EVFILT_READ, EV_ADD,  0, 0, conn);
 	int err = kevent(kqueue_fd, &kev, 1, NULL, 0, NULL);
 	if (err == -1) {
-		fprintf(stderr, "wait_for_read: kevent(%d, EPOLL_CTL_MOD): %s\n",
-			fd, strerror(errno));
+		fprintf(stderr, "wait_for_read: kevent(%d, %d, EVFILT_READ, EV_ADD): %s\n",
+			kqueue_fd, fd, strerror(errno));
 		exit(EXIT_FAILURE);
 	}
 }

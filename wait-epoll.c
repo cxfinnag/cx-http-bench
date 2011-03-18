@@ -84,13 +84,8 @@ wait_for_connected(struct conn_info *conn)
 void
 unregister_wait(int fd)
 {
-	struct epoll_event dummy;
-	int err = epoll_ctl(epoll_fd, EPOLL_CTL_DEL, fd, &dummy) == -1;
-	if (err == -1) {
-		fprintf(stderr, "unregister wait: epoll_ctl(%d, EPOLL_CTL_DEL): %s\n",
-			fd, strerror(errno));
-		exit(EXIT_FAILURE);
-	}
+	/* unregister_wait() is always followed by a close(), so we do not have to remove the fd
+	   from the epoll set, the OS does so automatically for us */
 	pending_queries--;
 }
 

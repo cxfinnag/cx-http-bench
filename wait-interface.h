@@ -19,11 +19,9 @@
  */
 
 /*
- * This is the fallback wait-by-poll interface, only used if
- * epoll or kqueue is not available.
+ * This is the generic wait interface which needs to be implemented by
+ * all the architecture specific poll-like implementations.
  */
-
-
 
 struct conn_info;
 

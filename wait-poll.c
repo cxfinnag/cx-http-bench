@@ -54,7 +54,8 @@ wait_for_action(void)
 		struct pollfd *p = &pending_list[n];
 		if (p->revents) {
 			int fd = p->fd;
-			connection_info[fd].handler(fd);
+			struct conn_info *conn = &connection_info[fd];
+			conn->handler(conn);
 			num_fds--;
 		}
 	}

@@ -477,15 +477,10 @@ poisson_wait(void)
 {
 	/* Return the number of time units to wait for the next event in a Poisson process
 	   where the average waiting time is 1 */
-	double r = drand48();
-	if (r < 1e-15) {
-		/* Values should be 0, 35527e-15 * N, N = 1, 2, ... 2 ^ 48 */
-		r = 1e-15; /* protect against zero value */
-	}
-	return -log(1.0 - r);
+	return -log(1.0 - drand48()); /* 1 - drand48() guaranteed to be >0, log is safe */
 }
 
-static void
+void
 read_queries(void)
 {
 	/* Read all the queries from stdin into an array. */

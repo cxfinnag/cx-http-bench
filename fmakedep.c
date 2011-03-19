@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2002,2011 Finn Arne Gangstad <finnag@pvv.org>
+ * Copyright (c) 2002,2011 Finn Arne Gangstad <finnag@pvv.org>
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above

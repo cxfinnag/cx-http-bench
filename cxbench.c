@@ -399,7 +399,7 @@ read_queries(void)
 	enum { BYTES_PER_READ = 16384 };
 
 	while (1) {
-		dynbuf_set_reserve(&queries, BYTES_PER_READ);
+		dynbuf_ensure_space(&queries, BYTES_PER_READ);
 		ssize_t l = read(0, queries.buffer + queries.pos, BYTES_PER_READ);
 		if (l == -1) {
 			fprintf(stderr, "Read error on stdin: %s\n", strerror(errno));
@@ -409,7 +409,7 @@ read_queries(void)
 			break;
 		queries.pos += l;
 	}
-	dynbuf_set_reserve(&queries, 1);
+	dynbuf_ensure_space(&queries, 1);
 	queries.buffer[queries.pos++] = 0;
 	dynbuf_shrink(&queries);
 	queries.pos--; /* Do not count terminating NUL */
@@ -513,9 +513,9 @@ handle_readable(struct conn_info *conn)
 		BYTES_PER_NETWORK_READ = 4032,
 		INITIAL_DYNBUF_RESERVATION = 8128,
 	};
-	dynbuf_set_reserve(&conn->data, INITIAL_DYNBUF_RESERVATION);
+	dynbuf_ensure_space(&conn->data, INITIAL_DYNBUF_RESERVATION);
 	do {
-		dynbuf_set_reserve(&conn->data, BYTES_PER_NETWORK_READ + 1);
+		dynbuf_ensure_space(&conn->data, BYTES_PER_NETWORK_READ + 1);
 		len = read(fd, conn->data.buffer + conn->data.pos, BYTES_PER_NETWORK_READ);
 		if (len > 0) {
 			conn->data.pos += len;

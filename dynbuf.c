@@ -43,7 +43,7 @@ dynbuf_free(struct dynbuf *d)
 #endif
 
 void
-dynbuf_set_reserve(struct dynbuf *d, size_t n)
+dynbuf_ensure_space(struct dynbuf *d, size_t n)
 {
 	if (d->pos + n > d->alloc) {
 		size_t new_size = MAX(d->alloc * 2, d->pos + n);

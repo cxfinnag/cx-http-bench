@@ -29,7 +29,8 @@ endif
 
 POLLER := wait-${POLL_METHOD}.o
 
-OBJ := cxbench.o dynbuf.o debug.o ${POLLER} connection-info.o
+OBJ := cxbench.o dynbuf.o debug.o ${POLLER} connection-info.o timeutil.o \
+	expdecay.o
 
 cxbench: ${OBJ}
 	${CC} ${LDFLAGS} ${CFLAGS} -o $@ $+

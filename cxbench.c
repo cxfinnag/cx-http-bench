@@ -32,7 +32,6 @@
 #include <sys/socket.h>
 #include <netdb.h>
 #include <errno.h>
-#include <sys/time.h>
 #include <math.h>
 #include <fcntl.h>
 #include <signal.h>
@@ -41,6 +40,7 @@
 #include "debug.h"
 #include "wait-interface.h"
 #include "connection-info.h"
+#include "timeutil.h"
 
 static void usage(const char *name);
 struct addrinfo *lookup_host(const char *address);
@@ -52,8 +52,6 @@ static void run_benchmark(const char *hostname, const struct addrinfo *addr);
 static void read_queries(void);
 static void randomize_query_list();
 static void initiate_query(const char *hostname, const struct addrinfo *target, const char *query);
-
-static double now(void);
 
 typedef const char *(*query_function)(void);
 query_function select_query_function(void);
@@ -255,13 +253,6 @@ lookup_host(const char *address)
 		return NULL;
 	}
 	return res;
-}
-
-static double now()
-{
-	struct timeval tv;
-	gettimeofday(&tv, NULL);
-	return tv.tv_sec + 1e-6 * tv.tv_usec;
 }
 
 static size_t num_queries = 0;

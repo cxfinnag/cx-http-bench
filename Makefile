@@ -49,6 +49,6 @@ fmakedep: fmakedep.c
 		--dep-header="$@ $*.o:" $(CFLAGS) $< > $@
 
 clean:
-	git clean -fX
+	git clean -fdX
 
 -include $(OBJ:%.o=%.d)

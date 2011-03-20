@@ -82,7 +82,7 @@ wait_for_connected(struct conn_info *conn)
 }
 
 void
-unregister_wait(sruct conn_info *conn)
+unregister_wait(struct conn_info *conn)
 {
 	/* unregister_wait() is always followed by a close(), so we do not have to remove the fd
 	   from the epoll set, the OS does so automatically for us */

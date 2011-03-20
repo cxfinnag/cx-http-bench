@@ -16,6 +16,7 @@ PROGS := cxbench
 
 CC := cc
 CFLAGS := -O2 -Wall -W
+LDFLAGS := -lm
 
 # Select the best poller depending on the OS
 OS := $(shell uname -s)

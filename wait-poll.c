@@ -79,9 +79,8 @@ do {						\
 } while (0)
 
 void
-unregister_wait(int fd)
+unregister_wait(struct conn_info *conn)
 {
-	const struct conn_info *conn = &connection_info[fd];
 	const unsigned int my_pending_index = conn->pending_index;
 
 	rt_assert(my_pending_index < pending_queries);

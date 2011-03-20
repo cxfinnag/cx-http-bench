@@ -474,7 +474,7 @@ handle_connected(struct conn_info *conn)
 		fprintf(stderr, "Write to fd %d fails: %s\n", fd, strerror(errno));
 		conn->status = CONN_UNUSED;
 		dynbuf_free(&conn->data);
-		unregister_wait(fd);
+		unregister_wait(conn);
 		close(fd);
 		errno = saved_errno;
 		return -1;
@@ -484,7 +484,7 @@ handle_connected(struct conn_info *conn)
 		   than the socket buffer */
 		fprintf(stderr, "Short write to fd %d: %llu/%llu, aborting query\n", fd,
 			(unsigned long long)written, (unsigned long long)len);
-		unregister_wait(fd);
+		unregister_wait(conn);
 		close(fd);
 		errno = EWOULDBLOCK;
 		return -1;
@@ -550,7 +550,7 @@ handle_readable(struct conn_info *conn)
 	}
 
 	dynbuf_free(&conn->data);
-	unregister_wait(fd);
+	unregister_wait(conn);
 	close(fd);
 	return len;
 }

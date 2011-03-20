@@ -1,5 +1,7 @@
 #include <sys/time.h>
 
+#include <stdio.h> /* for NULL of all things */
+
 #include "timeutil.h"
 
 double now(void)

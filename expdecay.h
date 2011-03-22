@@ -27,6 +27,7 @@ struct expdecay {
 
 double expdecay_value(const struct expdecay *);
 void expdecay_update(struct expdecay *, double value, double timestamp);
+void expdecay_init(struct expdecay *);
 
 #endif /* !EXPDECAY_H */
 

@@ -22,6 +22,11 @@
  *
  */
 
+#warning TODO: Add max # of queries (e.g limit to X queries total)
+#warning TODO: output # of queries, q/s and so on
+#warning TODO: ADD regex support for parsing results?
+#warning TODO: Add rate limiting, poisson and regular
+
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -41,6 +46,7 @@
 #include "wait-interface.h"
 #include "connection-info.h"
 #include "timeutil.h"
+#include "expdecay.h"
 
 static void usage(const char *name);
 struct addrinfo *lookup_host(const char *address);
@@ -59,25 +65,34 @@ static const char *next_random_query(void);
 static const char *next_loop_query(void);
 static const char *next_query_noloop(void);
 
-static int handle_connected(struct conn_info *);
-static int handle_readable(struct conn_info *);
+static int handle_connected(struct expdecay *, struct conn_info *);
+static int handle_readable(struct expdecay *, struct conn_info *);
 
 static int parse_http_result_code(const char *buf, size_t len);
 static char *find_char_or_end(const char *buf, char needle, const char *end);
 
 static void signal_handler(int signal);
 static int sig_permanent(int sig, void (*handler)(int));
+static void report_progress(struct expdecay *qps);
 
 static int loop_mode = 0;
 static int random_mode = 0;
 static unsigned int num_parallell = 1;
 static const char *query_prefix = "";
-
+static const char *output_file = "cxbench.out";
+static FILE *querylog_file;
+static unsigned long queries_sent = 0;
 
 int
 main(int argc, char **argv)
 {
 	parse_arguments(argc, argv);
+	querylog_file = fopen(output_file, "a");
+	if (!querylog_file) {
+		fprintf(stderr, "Cannot open %s for appending: %s\n",
+			output_file, strerror(errno));
+		exit(EXIT_FAILURE);
+	}
 	sig_permanent(SIGINT, signal_handler);
 
 	argc -= optind;
@@ -165,13 +180,16 @@ parse_arguments(int argc, char **argv)
 	};
 
 	int ch;
-	while ((ch = getopt_long(argc, argv, "dlrp:", opts, NULL)) != -1) {
+	while ((ch = getopt_long(argc, argv, "dlrp:o:", opts, NULL)) != -1) {
 		switch (ch) {
 		case 'd':
 			increase_debugging();
 			break;
 		case 'l':
 			loop_mode = 1;
+			break;
+		case 'o':
+			output_file = strdup(optarg);
 			break;
 		case 'r':
 			random_mode = 1;
@@ -267,8 +285,11 @@ run_benchmark(const char *hostname, const struct addrinfo *target)
 	query_function fn = select_query_function();
 	connection_info = calloc(num_parallell + MAX_FD_HEADROOM, sizeof connection_info[0]);
 	init_wait(num_parallell);
+	struct expdecay qps;
 
+	expdecay_init(&qps);
 	read_queries();
+	double next_report = now() + 1;
 	while (wait_num_pending() + num_parallell > 0) {
 		unsigned int n;
 		enum { MAX_CONNS_IN_ONE_SHOT = 3 }; /* Avoid going bananas with connections */
@@ -280,11 +301,24 @@ run_benchmark(const char *hostname, const struct addrinfo *target)
 				goto next;
 			}
 			initiate_query(hostname, target, query);
+			queries_sent++;
 		}
- 		wait_for_action();
+		double delta = next_report - now();
+ 		wait_for_action(&qps, delta > 0 ? delta : 0);
+		if (now() - next_report > -0.02) {
+			report_progress(&qps);
+			next_report += 1;
+		}
 	next:
 		{}
 	}
+}
+
+static void
+report_progress(struct expdecay *qps)
+{
+	printf("q: %10lu q/s: %9.7g  \r", queries_sent, expdecay_value(qps));
+	fflush(stdout);
 }
 
 static void
@@ -456,8 +490,9 @@ generate_query(char *buf, size_t buf_len, const char *host, const char *query)
 
 
 static int
-handle_connected(struct conn_info *conn)
+handle_connected(struct expdecay *qps, struct conn_info *conn)
 {
+	(void)qps;
 	int fd = conn->fd;
 	debug("fd %d is now connected\n", fd);
 	conn->status = CONN_CONNECTED;
@@ -500,7 +535,7 @@ handle_connected(struct conn_info *conn)
 }
 
 static int
-handle_readable(struct conn_info *conn)
+handle_readable(struct expdecay *qps, struct conn_info *conn)
 {
 	int fd = conn->fd;
 	debug("fd %d is now readable\n", fd);
@@ -525,18 +560,20 @@ handle_readable(struct conn_info *conn)
 
 	if (len == 0) {
 		double timestamp = now();
+		expdecay_update(qps, 1, timestamp);
 		conn->finished_result_time = timestamp;
 		conn->data.buffer[conn->data.pos] = 0; /* Zero terminate the result for str fns */
 		debug("EOF on fd %d. Total length = %d\n", fd, (int)conn->data.pos);
 		int http_result_code = parse_http_result_code(conn->data.buffer, conn->data.pos);
 		/* @@@ Parse the result more here, e.g. check that various regexes match
 		   or similar? */
-		printf("%.6f RES=%d LEN=%d TC=%.1fms T1=%.1fms TF=%.1fms Q=\"%s\"\n",
-		       timestamp, http_result_code, (int)conn->data.pos,
-		       1e3 * (conn->connected_time - conn->connect_time),
-		       1e3 * (conn->first_result_time - conn->connect_time),
-		       1e3 * (conn->finished_result_time - conn->connect_time),
-		       conn->query);
+		fprintf(querylog_file,
+			"%.6f RES=%d LEN=%d TC=%.1fms T1=%.1fms TF=%.1fms Q=\"%s\"\n",
+			timestamp, http_result_code, (int)conn->data.pos,
+			1e3 * (conn->connected_time - conn->connect_time),
+			1e3 * (conn->first_result_time - conn->connect_time),
+			1e3 * (conn->finished_result_time - conn->connect_time),
+			conn->query);
 	} else if (len == -1) {
 		if (errno == EWOULDBLOCK) {
 			debug("must wait for more data from fd %d\n", fd);

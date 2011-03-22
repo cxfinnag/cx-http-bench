@@ -19,6 +19,16 @@
 
 #include "expdecay.h"
 #include "timeutil.h"
+#include "debug.h"
+
+void
+expdecay_init(struct expdecay *ed)
+{
+	ed->last_update = now();
+	ed->value = 0;
+	ed->base_value = 0;
+	ed->decay_factor = 0.97; /* @@@ should be configurable */
+}
 
 double
 expdecay_value(const struct expdecay *ed)
@@ -33,9 +43,9 @@ expdecay_update(struct expdecay *ed, double value, double timestamp)
 		timestamp = now();
 	}
 	double delta = timestamp - ed->last_update;
+	ed->last_update = timestamp;
 	if (delta <= 0) {
 		ed->value += value;
-		ed->last_update = timestamp;
 		return;
 	}
 
@@ -49,6 +59,9 @@ expdecay_update(struct expdecay *ed, double value, double timestamp)
 	ed->base_value *= factor;
 	ed->value += value;
 	ed->base_value += delta;
+
+	debug(" *= %.7f, value += %.6g, base_value += %.6g\n",
+	      factor, value, delta);
 }
 
 /* Local Variables: */

@@ -21,8 +21,9 @@
 #include "dynbuf.h"
 
 struct conn_info;
+struct expdecay;
 
-typedef int (*event_handler)(struct conn_info *);
+typedef int (*event_handler)(struct expdecay *, struct conn_info *);
 
 enum conn_info_status {
 	CONN_UNUSED = 0, /* Should be 0 for easy memset cleaning of all statuses */

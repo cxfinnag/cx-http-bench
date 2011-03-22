@@ -20,6 +20,7 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <string.h>
+#include <time.h>
 
 #include "debug.h"
 #include "wait-interface.h"
@@ -39,13 +40,23 @@ init_wait(int max_pending)
 }
 
 void
-wait_for_action(void)
+wait_for_action(struct expdecay *qps, double timeout)
 {
 	debug("polling for %d fds\n", pending_queries);
-	rt_assert(pending_queries > 0);
 	
+	if (!pending_queries) {
+		if (timeout > 0) {
+			struct timespec ts;
+			ts.tv_sec = (time_t)timeout;
+			timeout -= ts.tv_sec;
+			ts.tv_nsec = 1e9 * timeout;
+			nanosleep(&ts, NULL);
+		}
+		return;
+	}
+
 	struct epoll_event *events = alloca(pending_queries * sizeof events[0]);
-	int num_fds = epoll_wait(epoll_fd, events, pending_queries, -1);
+	int num_fds = epoll_wait(epoll_fd, events, pending_queries, 1e3 * timeout);
 	if (num_fds == -1) {
 		if (errno == EINTR) {
 			fprintf(stderr, "epoll_wait was interrupted by a signal.\n");
@@ -59,7 +70,7 @@ wait_for_action(void)
 	int n;
 	for (n = 0; n < num_fds; n++) {
 		struct conn_info *conn = events[n].data.ptr;
-		conn->handler(conn);
+		conn->handler(qps, conn);
 	}
 }
 

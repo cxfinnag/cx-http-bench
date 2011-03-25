@@ -176,6 +176,7 @@ parse_arguments(int argc, char **argv)
 		{ "debug", no_argument, NULL, 'd' },
 		{ "loop", no_argument, NULL, 'l' },
 		{ "randomize", no_argument, NULL, 'r' },
+		{ "output", required_argument, NULL, 'o' },
 		{ "parallell", required_argument, NULL, 'p' },
 		{ "query-prefix", required_argument, NULL, 'q' },
 		{ "qps", required_argument, NULL, 's' },
@@ -184,7 +185,7 @@ parse_arguments(int argc, char **argv)
 	};
 
 	int ch;
-	while ((ch = getopt_long(argc, argv, "dlrp:o:", opts, NULL)) != -1) {
+	while ((ch = getopt_long(argc, argv, "dlrp:q:o:s:n:", opts, NULL)) != -1) {
 		switch (ch) {
 		case 'd':
 			increase_debugging();
@@ -322,7 +323,7 @@ run_benchmark(const char *hostname, const struct addrinfo *target)
 	expdecay_init(&qps);
 	read_queries();
 	double next_report = now() + 1;
-	while (wait_num_pending() + num_parallell > 0) {
+	while (wait_num_pending() || !stop_now) {
 		while (!stop_now && wait_num_pending() < num_parallell) {
 			const char *query = fn();
 			if (!query) {
@@ -699,6 +700,7 @@ usage(const char *name)
 	fprintf(stderr, "Usage: %s [OPTIONS] host:port\n\n"
 		" -d --debugging : Increase debug level (-d -d for spam)\n"
 		" -l --loop-mode : Run the same queries multple times\n"
+		" -o --output <file> : Write querylog to <file> [cxbench.out]\n"
 		" -r --random-mode: Run the queries in random order\n"
 		" -p --parallell <n>: Run <n> queries in parallell\n"
 		" -s --qps <rate> : Submit queries with <rate> qps. 0 means infinite\n"

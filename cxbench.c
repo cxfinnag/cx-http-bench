@@ -22,7 +22,6 @@
  *
  */
 
-#warning TODO: Add max # of queries (e.g limit to X queries total)
 #warning TODO: ADD regex support for parsing results?
 #warning TODO: Add rate limiting, poisson and regular
 
@@ -83,6 +82,8 @@ static const char *query_prefix = "";
 static const char *output_file = "cxbench.out";
 static FILE *querylog_file;
 static unsigned long queries_sent = 0;
+static unsigned long max_queries = 0;
+static double qps = 0;
 
 int
 main(int argc, char **argv)
@@ -177,6 +178,8 @@ parse_arguments(int argc, char **argv)
 		{ "randomize", no_argument, NULL, 'r' },
 		{ "parallell", required_argument, NULL, 'p' },
 		{ "query-prefix", required_argument, NULL, 'q' },
+		{ "qps", required_argument, NULL, 's' },
+		{ "num-queries", required_argument, NULL, 'n' },
 		{ NULL, 0, NULL, 0 }
 	};
 
@@ -194,6 +197,34 @@ parse_arguments(int argc, char **argv)
 			break;
 		case 'r':
 			random_mode = 1;
+			break;
+		case 's':
+			{
+				char *end;
+				qps = strtod(optarg, &end);
+				if (*end) {
+					fprintf(stderr, "Invalid qps '%s'\n", optarg);
+					exit(EXIT_FAILURE);
+				}
+				if (qps < 0) {
+					fprintf(stderr, "qps must be >= 0\n");
+					exit(EXIT_FAILURE);
+				}
+			}
+			break;
+		case 'n':
+			{
+				char *end;
+				max_queries = strtoul(optarg, &end, 10);
+				if (*end) {
+					fprintf(stderr, "Invalid num-queries '%s'\n", optarg);
+					exit(EXIT_FAILURE);
+				}
+				if (max_queries == 0) {
+					fprintf(stderr, "num-queries must be > 0\n");
+					exit(EXIT_FAILURE);
+				}
+			}
 			break;
 		case 'p':
 			num_parallell = atoi(optarg);
@@ -297,21 +328,24 @@ run_benchmark(const char *hostname, const struct addrinfo *target)
 			if (!query) {
 				num_parallell = 0;
 				fprintf(stderr, "Finished sending queries\n");
+				stop_now = 1;
 				goto next;
 			}
 			initiate_query(hostname, target, query);
 			queries_sent++;
+			if (max_queries && queries_sent >= max_queries) {
+				stop_now = 1;
+			}
 		}
 		double delta = next_report - now();
  		wait_for_action(&qps, delta > 0 ? delta : 0);
+	next:
 		if (stop_now) {
 			report_pending();
 		} else if (now() - next_report > -0.02) {
 			report_progress(&qps);
 			next_report += 1;
 		}
-	next:
-		{}
 	}
 }
 
@@ -667,6 +701,8 @@ usage(const char *name)
 		" -l --loop-mode : Run the same queries multple times\n"
 		" -r --random-mode: Run the queries in random order\n"
 		" -p --parallell <n>: Run <n> queries in parallell\n"
+		" -s --qps <rate> : Submit queries with <rate> qps. 0 means infinite\n"
+		" -n --num-queries <n>: Stop after <n> queries\n"
 		" -q --query-prefix <prefix> : Prepend <prefix> to all queries\n\n"
 		"A list of queries must be given on STDIN.\n\n", name);
 }

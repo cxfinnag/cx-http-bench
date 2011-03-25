@@ -32,6 +32,14 @@ do {							\
 	}						\
 } while(0)
 
+#define spam(format, args...)				\
+do {							\
+	if (is_debugging > 1) {				\
+		fprintf(stderr, format , ##args);	\
+	}						\
+} while(0)
+
+
 #define rt_assert(x)							\
 do {									\
 	if (!(x)) {							\

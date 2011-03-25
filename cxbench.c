@@ -356,8 +356,8 @@ run_benchmark(const char *hostname, const struct addrinfo *target)
 	while (wait_num_pending() || !stop_now) {
 		double timestamp = now();
 		debug("Time until next query: %.3fms\n", (time_of_next_query - timestamp) * 1e3);
-		while (!stop_now && wait_num_pending() < num_parallell 
-		       && timestamp + 0.01 > time_of_next_query) {
+		while (!stop_now && wait_num_pending() < num_parallell
+		       && timestamp >= time_of_next_query) {
 			const char *query = get_next_query();
 			if (!query) {
 				num_parallell = 0;
@@ -383,8 +383,8 @@ run_benchmark(const char *hostname, const struct addrinfo *target)
 	next:
 		if (stop_now) {
 			report_pending();
-		} else if (now() - next_report > -0.02) {
-			report_progress(&qps);
+		} else if (now() >= next_report) {
+			report_progress(&query_stats);
 			next_report += 1;
 		}
 	}

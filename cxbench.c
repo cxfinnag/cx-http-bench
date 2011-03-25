@@ -71,7 +71,7 @@ static char *find_char_or_end(const char *buf, char needle, const char *end);
 
 static void signal_handler(int signal);
 static int sig_permanent(int sig, void (*handler)(int));
-static void report_progress(struct expdecay *qps);
+static void report_progress(struct expdecay *query_stats);
 static void report_pending(void);
 
 typedef double (*waiter_fn)(double);
@@ -347,9 +347,9 @@ run_benchmark(const char *hostname, const struct addrinfo *target)
 	query_function get_next_query = select_query_function();
 	connection_info = calloc(num_parallell + MAX_FD_HEADROOM, sizeof connection_info[0]);
 	init_wait(num_parallell);
-	struct expdecay qps;
+	struct expdecay query_stats;
 
-	expdecay_init(&qps);
+	expdecay_init(&query_stats);
 	read_queries();
 	double next_report = now() + 1;
 	time_of_next_query = now(); /*  + waiter(query_interval); */
@@ -379,7 +379,7 @@ run_benchmark(const char *hostname, const struct addrinfo *target)
 			      delta * 1e3, 1e3 * (time_of_next_query - timestamp));
 			delta = time_of_next_query - timestamp;
 		}
- 		wait_for_action(&qps, stop_now ? 1000 : delta > 0 ? delta : 0);
+ 		wait_for_action(&query_stats, stop_now ? 1000 : delta > 0 ? delta : 0);
 	next:
 		if (stop_now) {
 			report_pending();
@@ -391,9 +391,9 @@ run_benchmark(const char *hostname, const struct addrinfo *target)
 }
 
 static void
-report_progress(struct expdecay *qps)
+report_progress(struct expdecay *query_stats)
 {
-	printf("q: %10lu q/s: %9.7g  \r", queries_sent, expdecay_value(qps));
+	printf("q: %10lu q/s: %9.7g  \r", queries_sent, expdecay_value(query_stats));
 	fflush(stdout);
 }
 
@@ -580,9 +580,9 @@ generate_query(char *buf, size_t buf_len, const char *host, const char *query)
 
 
 static int
-handle_connected(struct expdecay *qps, struct conn_info *conn)
+handle_connected(struct expdecay *query_stats, struct conn_info *conn)
 {
-	(void)qps;
+	(void)query_stats;
 	int fd = conn->fd;
 	debug("fd %d is now connected\n", fd);
 	conn->status = CONN_CONNECTED;
@@ -625,7 +625,7 @@ handle_connected(struct expdecay *qps, struct conn_info *conn)
 }
 
 static int
-handle_readable(struct expdecay *qps, struct conn_info *conn)
+handle_readable(struct expdecay *query_stats, struct conn_info *conn)
 {
 	int fd = conn->fd;
 	debug("fd %d is now readable\n", fd);
@@ -650,7 +650,7 @@ handle_readable(struct expdecay *qps, struct conn_info *conn)
 
 	if (len == 0) {
 		double timestamp = now();
-		expdecay_update(qps, 1, timestamp);
+		expdecay_update(query_stats, 1, timestamp);
 		conn->finished_result_time = timestamp;
 		conn->data.buffer[conn->data.pos] = 0; /* Zero terminate the result for str fns */
 		debug("EOF on fd %d. Total length = %d\n", fd, (int)conn->data.pos);

@@ -73,7 +73,9 @@ static char *find_char_or_end(const char *buf, char needle, const char *end);
 static void signal_handler(int signal);
 static int sig_permanent(int sig, void (*handler)(int));
 static void report_progress(struct expdecay *qps);
+static void report_pending(void);
 
+static unsigned int stop_now = 0;
 static int loop_mode = 0;
 static int random_mode = 0;
 static unsigned int num_parallell = 1;
@@ -290,9 +292,7 @@ run_benchmark(const char *hostname, const struct addrinfo *target)
 	read_queries();
 	double next_report = now() + 1;
 	while (wait_num_pending() + num_parallell > 0) {
-		unsigned int n;
-		enum { MAX_CONNS_IN_ONE_SHOT = 3 }; /* Avoid going bananas with connections */
-		for (n = 0; wait_num_pending() < num_parallell && n < MAX_CONNS_IN_ONE_SHOT; n++) {
+		while (!stop_now && wait_num_pending() < num_parallell) {
 			const char *query = fn();
 			if (!query) {
 				num_parallell = 0;
@@ -304,7 +304,9 @@ run_benchmark(const char *hostname, const struct addrinfo *target)
 		}
 		double delta = next_report - now();
  		wait_for_action(&qps, delta > 0 ? delta : 0);
-		if (now() - next_report > -0.02) {
+		if (stop_now) {
+			report_pending();
+		} else if (now() - next_report > -0.02) {
 			report_progress(&qps);
 			next_report += 1;
 		}
@@ -319,6 +321,14 @@ report_progress(struct expdecay *qps)
 	printf("q: %10lu q/s: %9.7g  \r", queries_sent, expdecay_value(qps));
 	fflush(stdout);
 }
+
+static void
+report_pending(void)
+{
+	printf("STOPPING. Pending queries: %d                      \r", wait_num_pending());
+	fflush(stdout);
+}
+
 
 static void
 initiate_query(const char *hostname, const struct addrinfo *target, const char *query)
@@ -645,7 +655,7 @@ static void
 signal_handler(int sig)
 {
 	(void)sig;
-	num_parallell = 0;
+	stop_now = 1;
 }
 
 

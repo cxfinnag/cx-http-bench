@@ -23,7 +23,6 @@
  */
 
 #warning TODO: Add max # of queries (e.g limit to X queries total)
-#warning TODO: output # of queries, q/s and so on
 #warning TODO: ADD regex support for parsing results?
 #warning TODO: Add rate limiting, poisson and regular
 
@@ -564,6 +563,7 @@ handle_readable(struct expdecay *qps, struct conn_info *conn)
 		conn->finished_result_time = timestamp;
 		conn->data.buffer[conn->data.pos] = 0; /* Zero terminate the result for str fns */
 		debug("EOF on fd %d. Total length = %d\n", fd, (int)conn->data.pos);
+		spam("Received data:\n%s\n", conn->data.buffer);
 		int http_result_code = parse_http_result_code(conn->data.buffer, conn->data.pos);
 		/* @@@ Parse the result more here, e.g. check that various regexes match
 		   or similar? */
@@ -653,7 +653,7 @@ static void
 usage(const char *name)
 {
 	fprintf(stderr, "Usage: %s [OPTIONS] host:port\n\n"
-		" -d --debugging : Enable debug spam\n"
+		" -d --debugging : Increase debug level (-d -d for spam)\n"
 		" -l --loop-mode : Run the same queries multple times\n"
 		" -r --random-mode: Run the queries in random order\n"
 		" -p --parallell <n>: Run <n> queries in parallell\n"

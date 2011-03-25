@@ -23,7 +23,6 @@
  */
 
 #warning TODO: ADD regex support for parsing results?
-#warning TODO: Add rate limiting, poisson and regular
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -38,6 +37,7 @@
 #include <math.h>
 #include <fcntl.h>
 #include <signal.h>
+#include <time.h>
 
 #include "dynbuf.h"
 #include "debug.h"
@@ -74,6 +74,12 @@ static int sig_permanent(int sig, void (*handler)(int));
 static void report_progress(struct expdecay *qps);
 static void report_pending(void);
 
+typedef double (*waiter_fn)(double);
+
+static double poisson_wait(double interval);
+static double regular_wait(double interval);
+static waiter_fn waiter = poisson_wait;
+
 static unsigned int stop_now = 0;
 static int loop_mode = 0;
 static int random_mode = 0;
@@ -83,7 +89,8 @@ static const char *output_file = "cxbench.out";
 static FILE *querylog_file;
 static unsigned long queries_sent = 0;
 static unsigned long max_queries = 0;
-static double qps = 0;
+static double query_interval = 0;
+static double time_of_next_query = 0;
 
 int
 main(int argc, char **argv)
@@ -96,6 +103,7 @@ main(int argc, char **argv)
 		exit(EXIT_FAILURE);
 	}
 	sig_permanent(SIGINT, signal_handler);
+	srand48(time(0) + getpid() * 131);
 
 	argc -= optind;
 	argv += optind;
@@ -173,6 +181,7 @@ static void
 parse_arguments(int argc, char **argv)
 {
 	static struct option opts[] = {
+		{ "help", no_argument, NULL, 'h' },
 		{ "debug", no_argument, NULL, 'd' },
 		{ "loop", no_argument, NULL, 'l' },
 		{ "randomize", no_argument, NULL, 'r' },
@@ -181,12 +190,17 @@ parse_arguments(int argc, char **argv)
 		{ "query-prefix", required_argument, NULL, 'q' },
 		{ "qps", required_argument, NULL, 's' },
 		{ "num-queries", required_argument, NULL, 'n' },
+		{ "wait-mode", required_argument, NULL, 'w' },
 		{ NULL, 0, NULL, 0 }
 	};
 
 	int ch;
-	while ((ch = getopt_long(argc, argv, "dlrp:q:o:s:n:", opts, NULL)) != -1) {
+	while ((ch = getopt_long(argc, argv, "hdlrp:q:o:s:n:w:", opts, NULL)) != -1) {
 		switch (ch) {
+		case 'h':
+			usage(argv[0]);
+			exit(EXIT_SUCCESS);
+			break;
 		case 'd':
 			increase_debugging();
 			break;
@@ -202,15 +216,20 @@ parse_arguments(int argc, char **argv)
 		case 's':
 			{
 				char *end;
-				qps = strtod(optarg, &end);
+				double t = strtod(optarg, &end);
 				if (*end) {
 					fprintf(stderr, "Invalid qps '%s'\n", optarg);
 					exit(EXIT_FAILURE);
 				}
-				if (qps < 0) {
+				if (t < 0) {
 					fprintf(stderr, "qps must be >= 0\n");
 					exit(EXIT_FAILURE);
+				} else if (t > 1e-10) {
+					query_interval = 1.0 / t;
+				} else {
+					query_interval = 0;
 				}
+				debug("query interval: %.3f\n", query_interval);
 			}
 			break;
 		case 'n':
@@ -236,6 +255,16 @@ parse_arguments(int argc, char **argv)
 			break;
 		case 'q':
 			query_prefix = strdup(optarg);
+			break;
+		case 'w':
+			if (strcasecmp(optarg, "poisson") == 0) {
+				waiter = poisson_wait;
+			} else if (strcasecmp(optarg, "regular") == 0) {
+				waiter = regular_wait;
+			} else {
+				fprintf(stderr, "Unknown waiter '%s'\n", optarg);
+				exit(EXIT_FAILURE);
+			}
 			break;
 		default:
 			usage(argv[0]);
@@ -315,7 +344,7 @@ enum { MAX_FD_HEADROOM = 20 };
 static void
 run_benchmark(const char *hostname, const struct addrinfo *target)
 {
-	query_function fn = select_query_function();
+	query_function get_next_query = select_query_function();
 	connection_info = calloc(num_parallell + MAX_FD_HEADROOM, sizeof connection_info[0]);
 	init_wait(num_parallell);
 	struct expdecay qps;
@@ -323,9 +352,13 @@ run_benchmark(const char *hostname, const struct addrinfo *target)
 	expdecay_init(&qps);
 	read_queries();
 	double next_report = now() + 1;
+	time_of_next_query = now(); /*  + waiter(query_interval); */
 	while (wait_num_pending() || !stop_now) {
-		while (!stop_now && wait_num_pending() < num_parallell) {
-			const char *query = fn();
+		double timestamp = now();
+		debug("Time until next query: %.3fms\n", (time_of_next_query - timestamp) * 1e3);
+		while (!stop_now && wait_num_pending() < num_parallell 
+		       && timestamp + 0.01 > time_of_next_query) {
+			const char *query = get_next_query();
 			if (!query) {
 				num_parallell = 0;
 				fprintf(stderr, "Finished sending queries\n");
@@ -333,13 +366,20 @@ run_benchmark(const char *hostname, const struct addrinfo *target)
 				goto next;
 			}
 			initiate_query(hostname, target, query);
+			time_of_next_query += waiter(query_interval);
+			debug("time_of_next_query = %.3f\n", time_of_next_query);
 			queries_sent++;
 			if (max_queries && queries_sent >= max_queries) {
 				stop_now = 1;
 			}
 		}
-		double delta = next_report - now();
- 		wait_for_action(&qps, delta > 0 ? delta : 0);
+		double delta = next_report - timestamp;
+		if (wait_num_pending() < num_parallell && time_of_next_query < next_report) {
+			debug("next report in %.3fms, but next query in %.3fms\n",
+			      delta * 1e3, 1e3 * (time_of_next_query - timestamp));
+			delta = time_of_next_query - timestamp;
+		}
+ 		wait_for_action(&qps, stop_now ? 1000 : delta > 0 ? delta : 0);
 	next:
 		if (stop_now) {
 			report_pending();
@@ -463,11 +503,17 @@ next_query_noloop(void)
 }
 
 static double
-poisson_wait(void)
+poisson_wait(double interval)
 {
 	/* Return the number of time units to wait for the next event in a Poisson process
 	   where the average waiting time is 1 */
-	return -log(1.0 - drand48()); /* 1 - drand48() guaranteed to be >0, log is safe */
+	return interval * -log(1.0 - drand48()); /* 1.0 - drand48() guaranteed > 0 */
+}
+
+static double
+regular_wait(double interval)
+{
+	return interval;
 }
 
 void
@@ -697,7 +743,7 @@ signal_handler(int sig)
 static void
 usage(const char *name)
 {
-	fprintf(stderr, "Usage: %s [OPTIONS] host:port\n\n"
+	fprintf(stderr, "Usage: %s [OPTIONS] <host>:<port>\n\n"
 		" -d --debugging : Increase debug level (-d -d for spam)\n"
 		" -l --loop-mode : Run the same queries multple times\n"
 		" -o --output <file> : Write querylog to <file> [cxbench.out]\n"
@@ -705,7 +751,8 @@ usage(const char *name)
 		" -p --parallell <n>: Run <n> queries in parallell\n"
 		" -s --qps <rate> : Submit queries with <rate> qps. 0 means infinite\n"
 		" -n --num-queries <n>: Stop after <n> queries\n"
-		" -q --query-prefix <prefix> : Prepend <prefix> to all queries\n\n"
+		" -q --query-prefix <prefix> : Prepend <prefix> to all queries\n"
+		" -w --wait-mode <mode> : Wait mode poisson or regular [poisson]\n\n"
 		"A list of queries must be given on STDIN.\n\n", name);
 }
 

@@ -15,7 +15,7 @@
 PROGS := cxbench
 
 CC := cc
-CFLAGS := -O2 -Wall -W
+CFLAGS := -O2 -Wall -W -Wshadow
 LDFLAGS := -lm
 
 # Select the best poller depending on the OS

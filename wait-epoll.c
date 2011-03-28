@@ -45,14 +45,11 @@ wait_for_action(struct expdecay *qps, double timeout)
 	debug("polling for %d fds\n", pending_queries);
 	
 	if (!pending_queries) {
-		if (timeout > 0) {
-			struct timespec ts;
-			ts.tv_sec = (time_t)timeout;
-			timeout -= ts.tv_sec;
-			ts.tv_nsec = 1e9 * timeout;
-			nanosleep(&ts, NULL);
-		}
-		return;
+		struct timespec ts;
+		ts.tv_sec = (time_t)timeout;
+		timeout -= ts.tv_sec;
+		ts.tv_nsec = 1e9 * timeout;
+		nanosleep(&ts, NULL);
 	}
 
 	struct epoll_event *events = alloca(pending_queries * sizeof events[0]);

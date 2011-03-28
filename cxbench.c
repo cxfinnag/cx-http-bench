@@ -80,7 +80,7 @@ static double poisson_wait(double interval);
 static double regular_wait(double interval);
 static waiter_fn waiter = poisson_wait;
 
-static unsigned int stop_now = 0;
+static volatile unsigned int stop_now = 0;
 static int loop_mode = 0;
 static int random_mode = 0;
 static unsigned int num_parallell = 1;

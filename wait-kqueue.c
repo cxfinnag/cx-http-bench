@@ -20,6 +20,7 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <string.h>
+#include <time.h>
 
 #include "debug.h"
 #include "wait-interface.h"
@@ -40,13 +41,23 @@ init_wait(int max_pending)
 }
 
 void
-wait_for_action(void)
+wait_for_action(struct expdecay *query_stats, double timeout)
 {
+	struct timespec ts;
+
 	debug("polling for %d fds\n", pending_queries);
-	rt_assert(pending_queries > 0);
 	
+	ts.tv_sec = (int)timeout;
+	timeout -= ts.tv_sec;
+	ts.tv_nsec = 1e9 * timeout;
+
+	if (pending_queries == 0) {
+		nanosleep(&ts, NULL);
+		return;
+	}
+
 	struct kevent *events = alloca(pending_queries * sizeof events[0]);
-	int num_fds = kevent(kqueue_fd, NULL, 0, events, pending_queries, NULL);
+	int num_fds = kevent(kqueue_fd, NULL, 0, events, pending_queries, &ts);
 	if (num_fds == -1) {
 		if (errno == EINTR) {
 			fprintf(stderr, "kevent was interrupted by a signal.\n");
@@ -60,7 +71,7 @@ wait_for_action(void)
 	int n;
 	for (n = 0; n < num_fds; n++) {
 		struct conn_info *conn = events[n].udata;
-		conn->handler(conn);
+		conn->handler(query_stats, conn);
 	}
 }
 

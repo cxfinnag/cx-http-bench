@@ -27,7 +27,7 @@ struct conn_info;
 struct expdecay;
 
 void init_wait(int max_pending);
-void wait_for_action(struct expdecay *qps, double timeout); /* timeout in s */
+void wait_for_action(struct expdecay *query_stats, double timeout); /* timeout in s */
 void unregister_wait(struct conn_info *conn);
 unsigned int wait_num_pending(void);
 void wait_for_connected(struct conn_info *conn);

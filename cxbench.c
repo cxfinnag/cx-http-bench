@@ -85,8 +85,10 @@ static int loop_mode = 0;
 static int random_mode = 0;
 static unsigned int num_parallell = 1;
 static const char *query_prefix = "";
-static const char *output_file = "cxbench.out";
+static const char *output_filename = "cxbench.out";
+static const char *error_filename = "cxbench.errors";
 static FILE *querylog_file;
+static FILE *error_file;
 static unsigned long queries_sent = 0;
 static unsigned long max_queries = 0;
 static double query_interval = 0;
@@ -96,12 +98,19 @@ int
 main(int argc, char **argv)
 {
 	parse_arguments(argc, argv);
-	querylog_file = fopen(output_file, "a");
+	querylog_file = fopen(output_filename, "a");
 	if (!querylog_file) {
-		fprintf(stderr, "Cannot open %s for appending: %s\n",
-			output_file, strerror(errno));
+		fprintf(stderr, "Cannot open '%s' for appending: %s\n", output_filename,
+			strerror(errno));
 		exit(EXIT_FAILURE);
 	}
+	error_file = fopen(error_filename, "a");
+	if (!error_file) {
+		fprintf(stderr, "Cannot open '%s' for appending: %s\n", error_filename,
+			strerror(errno));
+		exit(EXIT_FAILURE);
+	}
+
 	sig_permanent(SIGINT, signal_handler);
 	srand48(time(0) + getpid() * 131);
 
@@ -185,6 +194,7 @@ parse_arguments(int argc, char **argv)
 		{ "debug", no_argument, NULL, 'd' },
 		{ "loop", no_argument, NULL, 'l' },
 		{ "randomize", no_argument, NULL, 'r' },
+		{ "errors", required_argument, NULL, 'e' },
 		{ "output", required_argument, NULL, 'o' },
 		{ "parallell", required_argument, NULL, 'p' },
 		{ "query-prefix", required_argument, NULL, 'q' },
@@ -195,7 +205,7 @@ parse_arguments(int argc, char **argv)
 	};
 
 	int ch;
-	while ((ch = getopt_long(argc, argv, "hdlrp:q:o:s:n:w:", opts, NULL)) != -1) {
+	while ((ch = getopt_long(argc, argv, "hdlrp:q:e:o:s:n:w:", opts, NULL)) != -1) {
 		switch (ch) {
 		case 'h':
 			usage(argv[0]);
@@ -207,8 +217,11 @@ parse_arguments(int argc, char **argv)
 		case 'l':
 			loop_mode = 1;
 			break;
+		case 'e':
+			error_filename = strdup(optarg);
+			break;
 		case 'o':
-			output_file = strdup(optarg);
+			output_filename = strdup(optarg);
 			break;
 		case 'r':
 			random_mode = 1;
@@ -665,6 +678,13 @@ handle_readable(struct expdecay *query_stats, struct conn_info *conn)
 			1e3 * (conn->first_result_time - conn->connect_time),
 			1e3 * (conn->finished_result_time - conn->connect_time),
 			conn->query);
+
+		/* Log the complete query and result if there was an error */
+		if (http_result_code < 200 || http_result_code > 299) {
+			fprintf(error_file, "%.6f Q=\"%s\"\nERROR RESULT:\n%s\n",
+				timestamp, conn->query, conn->data.buffer);
+		}
+
 	} else if (len == -1) {
 		if (errno == EWOULDBLOCK) {
 			debug("must wait for more data from fd %d\n", fd);
@@ -746,6 +766,7 @@ usage(const char *name)
 	fprintf(stderr, "Usage: %s [OPTIONS] <host>:<port>\n\n"
 		" -d --debugging : Increase debug level (-d -d for spam)\n"
 		" -l --loop-mode : Run the same queries multple times\n"
+		" -e --errors <file> : Log all failed queries to <file> [cxbench.errors]\n"
 		" -o --output <file> : Write querylog to <file> [cxbench.out]\n"
 		" -r --random-mode: Run the queries in random order\n"
 		" -p --parallell <n>: Run <n> queries in parallell\n"

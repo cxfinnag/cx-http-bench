@@ -35,10 +35,10 @@ init_wait(int max_pending)
 }
 
 void
-wait_for_action(void)
+wait_for_action(struct expdecay *query_stats, double delay)
 {
 	debug("polling for %d fds\n", pending_queries);
-	int num_fds = poll(pending_list, pending_queries, -1);
+	int num_fds = poll(pending_list, pending_queries, 1e3 * delay);
 	if (num_fds == -1) {
 		if (errno == EINTR) {
 			fprintf(stderr, "Poll was interrupted by a signal.\n");
@@ -55,7 +55,7 @@ wait_for_action(void)
 		if (p->revents) {
 			int fd = p->fd;
 			struct conn_info *conn = &connection_info[fd];
-			conn->handler(conn);
+			conn->handler(query_stats, conn);
 			num_fds--;
 		}
 	}

@@ -34,7 +34,7 @@ OBJ := cxbench.o dynbuf.o debug.o ${POLLER} connection-info.o timeutil.o \
 	expdecay.o
 
 cxbench: ${OBJ}
-	${CC} ${LDFLAGS} ${CFLAGS} -o $@ $+
+	${CC} ${CFLAGS} -o $@ $+ ${LDFLAGS}
 
 fmakedep: fmakedep.c
 	$(CC) $(CFLAGS) -o $@ $<

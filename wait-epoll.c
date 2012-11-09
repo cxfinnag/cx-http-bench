@@ -50,6 +50,7 @@ wait_for_action(struct expdecay *qps, double timeout)
 		timeout -= ts.tv_sec;
 		ts.tv_nsec = 1e9 * timeout;
 		nanosleep(&ts, NULL);
+		return;
 	}
 
 	struct epoll_event *events = alloca(pending_queries * sizeof events[0]);

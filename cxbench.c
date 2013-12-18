@@ -83,6 +83,7 @@ static waiter_fn waiter = poisson_wait;
 static volatile unsigned int stop_now = 0;
 static int loop_mode = 0;
 static int random_mode = 0;
+static int use_post = 0;
 static unsigned int num_parallell = 1;
 static const char *query_prefix = "";
 static const char *header = "Dummy: dummy";
@@ -199,6 +200,7 @@ parse_arguments(int argc, char **argv)
 		{ "output", required_argument, NULL, 'o' },
 		{ "parallell", required_argument, NULL, 'p' },
 		{ "query-prefix", required_argument, NULL, 'q' },
+		{ "use-post", no_argument, NULL, 'P' },
 		{ "header", required_argument, NULL, 'H' },
 		{ "qps", required_argument, NULL, 's' },
 		{ "num-queries", required_argument, NULL, 'n' },
@@ -207,7 +209,7 @@ parse_arguments(int argc, char **argv)
 	};
 
 	int ch;
-	while ((ch = getopt_long(argc, argv, "hdlrp:q:H:e:o:s:n:w:", opts, NULL)) != -1) {
+	while ((ch = getopt_long(argc, argv, "hdlrp:q:PH:e:o:s:n:w:", opts, NULL)) != -1) {
 		switch (ch) {
 		case 'h':
 			usage(argv[0]);
@@ -270,6 +272,9 @@ parse_arguments(int argc, char **argv)
 			break;
 		case 'q':
 			query_prefix = strdup(optarg);
+			break;
+		case 'P':
+			use_post = 1;
 			break;
 		case 'H':
 			header = strdup(optarg);
@@ -590,9 +595,16 @@ read_queries(void)
 size_t
 generate_query(char *buf, size_t buf_len, const char *host, const char *query)
 {
-	size_t would_write = snprintf(buf, buf_len,
+	size_t would_write;
+	if (use_post) {
+		would_write = snprintf(buf, buf_len,
+				      "POST %s HTTP/1.1\r\nHost: %s\r\nConnection: close\r\nContent-Length: %zu\r\n%s\r\n\r\n%s",
+				      query_prefix, host, strlen(query), header, query);
+	} else {
+		would_write = snprintf(buf, buf_len,
 				      "GET %s%s HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n%s\r\n\r\n",
 				      query_prefix, query, host, header);
+	}
 	return MIN(buf_len - 1, would_write);
 }
 

@@ -85,6 +85,7 @@ static int loop_mode = 0;
 static int random_mode = 0;
 static unsigned int num_parallell = 1;
 static const char *query_prefix = "";
+static const char *header = "Dummy: dummy";
 static const char *output_filename = "cxbench.out";
 static const char *error_filename = "cxbench.errors";
 static FILE *querylog_file;
@@ -198,6 +199,7 @@ parse_arguments(int argc, char **argv)
 		{ "output", required_argument, NULL, 'o' },
 		{ "parallell", required_argument, NULL, 'p' },
 		{ "query-prefix", required_argument, NULL, 'q' },
+		{ "header", required_argument, NULL, 'H' },
 		{ "qps", required_argument, NULL, 's' },
 		{ "num-queries", required_argument, NULL, 'n' },
 		{ "wait-mode", required_argument, NULL, 'w' },
@@ -205,7 +207,7 @@ parse_arguments(int argc, char **argv)
 	};
 
 	int ch;
-	while ((ch = getopt_long(argc, argv, "hdlrp:q:e:o:s:n:w:", opts, NULL)) != -1) {
+	while ((ch = getopt_long(argc, argv, "hdlrp:q:H:e:o:s:n:w:", opts, NULL)) != -1) {
 		switch (ch) {
 		case 'h':
 			usage(argv[0]);
@@ -268,6 +270,9 @@ parse_arguments(int argc, char **argv)
 			break;
 		case 'q':
 			query_prefix = strdup(optarg);
+			break;
+		case 'H':
+			header = strdup(optarg);
 			break;
 		case 'w':
 			if (strcasecmp(optarg, "poisson") == 0) {
@@ -586,8 +591,8 @@ size_t
 generate_query(char *buf, size_t buf_len, const char *host, const char *query)
 {
 	size_t would_write = snprintf(buf, buf_len,
-				      "GET %s%s HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n\r\n",
-				      query_prefix, query, host);
+				      "GET %s%s HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n%s\r\n\r\n",
+				      query_prefix, query, host, header);
 	return MIN(buf_len - 1, would_write);
 }
 

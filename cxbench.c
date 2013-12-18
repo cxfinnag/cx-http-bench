@@ -645,8 +645,8 @@ handle_connected(struct expdecay *query_stats, struct conn_info *conn)
 		return -1;
 	}
 	buffer[len] = 0;
-	debug("Wrote to fd %d %d bytes: 'Get %s...'\n", fd, (int)written,
-		conn->query);
+	debug("Wrote to fd %d %d bytes: '%s'\n", fd, (int)written,
+		buffer);
 
 	conn->handler = handle_readable;
 	wait_for_read(conn);
